@@ -67,6 +67,11 @@ export class DeviceStore {
 
   /** Register a one-time token (called when QR code is generated) */
   registerToken(token: string, agentId: string, expiresAt: number): void {
+    // Clean up expired tokens to prevent accumulation
+    const now = Date.now();
+    for (const [key, entry] of this.tokens) {
+      if (now > entry.expiresAt) this.tokens.delete(key);
+    }
     this.tokens.set(token, { token, agentId, expiresAt });
   }
 

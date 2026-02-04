@@ -9,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@multica/ui/components/ui/alert-dialog'
+import { parseUserAgent } from '../lib/parse-user-agent'
 
 interface DeviceMeta {
   userAgent?: string
@@ -19,28 +20,6 @@ interface DeviceMeta {
 interface PendingConfirm {
   deviceId: string
   meta?: DeviceMeta
-}
-
-function parseUserAgent(ua: string): { browser: string; os: string } {
-  let os = 'Unknown'
-  if (/Mac OS X/.test(ua)) os = 'macOS'
-  else if (/Windows/.test(ua)) os = 'Windows'
-  else if (/Android/.test(ua)) os = 'Android'
-  else if (/iPhone|iPad/.test(ua)) os = 'iOS'
-  else if (/Linux/.test(ua)) os = 'Linux'
-
-  let browser = 'Unknown'
-  const edgeMatch = ua.match(/Edg\/(\d+)/)
-  const chromeMatch = ua.match(/Chrome\/(\d+)/)
-  const safariMatch = ua.match(/Version\/(\d+).*Safari/)
-  const firefoxMatch = ua.match(/Firefox\/(\d+)/)
-
-  if (edgeMatch) browser = `Edge ${edgeMatch[1]}`
-  else if (firefoxMatch) browser = `Firefox ${firefoxMatch[1]}`
-  else if (chromeMatch) browser = `Chrome ${chromeMatch[1]}`
-  else if (safariMatch) browser = `Safari ${safariMatch[1]}`
-
-  return { browser, os }
 }
 
 /**
@@ -55,6 +34,9 @@ export function DeviceConfirmDialog() {
     window.electronAPI?.hub.onDeviceConfirmRequest((deviceId: string, meta?: DeviceMeta) => {
       setPending({ deviceId, meta })
     })
+    return () => {
+      window.electronAPI?.hub.offDeviceConfirmRequest()
+    }
   }, [])
 
   const handleAllow = useCallback(() => {

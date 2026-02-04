@@ -270,7 +270,15 @@ export function setupDeviceConfirmation(mainWindow: Electron.BrowserWindow): voi
   // Register confirm handler on Hub — sends request to renderer, awaits response
   h.setConfirmHandler((deviceId: string, _agentId: string, meta) => {
     return new Promise<boolean>((resolve) => {
-      pendingConfirms.set(deviceId, resolve)
+      // Auto-reject if user doesn't respond within 60 seconds
+      const timeout = setTimeout(() => {
+        pendingConfirms.delete(deviceId)
+        resolve(false)
+      }, 60_000)
+      pendingConfirms.set(deviceId, (allowed: boolean) => {
+        clearTimeout(timeout)
+        resolve(allowed)
+      })
       mainWindow.webContents.send('hub:device-confirm-request', deviceId, meta)
     })
   })

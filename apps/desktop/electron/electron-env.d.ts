@@ -92,6 +92,7 @@ interface ElectronAPI {
     sendMessage: (agentId: string, content: string) => Promise<unknown>
     registerToken: (token: string, agentId: string, expiresAt: number) => Promise<unknown>
     onDeviceConfirmRequest: (callback: (deviceId: string, meta?: DeviceMeta) => void) => void
+    offDeviceConfirmRequest: () => void
     deviceConfirmResponse: (deviceId: string, allowed: boolean) => void
     listDevices: () => Promise<DeviceEntryInfo[]>
     revokeDevice: (deviceId: string) => Promise<{ ok: boolean }>

@@ -60,6 +60,9 @@ const electronAPI = {
     onDeviceConfirmRequest: (callback: (deviceId: string, meta?: { userAgent?: string; platform?: string; language?: string }) => void) => {
       ipcRenderer.on('hub:device-confirm-request', (_event, deviceId: string, meta?: { userAgent?: string; platform?: string; language?: string }) => callback(deviceId, meta))
     },
+    offDeviceConfirmRequest: () => {
+      ipcRenderer.removeAllListeners('hub:device-confirm-request')
+    },
     deviceConfirmResponse: (deviceId: string, allowed: boolean) => {
       ipcRenderer.send('hub:device-confirm-response', deviceId, allowed)
     },
