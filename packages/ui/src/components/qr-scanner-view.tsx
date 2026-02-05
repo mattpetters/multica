@@ -31,6 +31,7 @@ export interface QrScannerProps {
 }
 
 const ACTIVE_STATES: ScannerState[] = [
+  "requesting",
   "scanning",
   "detected",
   "success",
