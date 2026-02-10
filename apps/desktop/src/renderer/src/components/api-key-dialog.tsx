@@ -18,7 +18,8 @@ interface ApiKeyDialogProps {
   onOpenChange: (open: boolean) => void
   providerId: string
   providerName: string
-  onSuccess?: () => void
+  showModelInput?: boolean
+  onSuccess?: (modelId?: string) => void
 }
 
 export function ApiKeyDialog({
@@ -26,15 +27,22 @@ export function ApiKeyDialog({
   onOpenChange,
   providerId,
   providerName,
+  showModelInput,
   onSuccess,
 }: ApiKeyDialogProps) {
   const [apiKey, setApiKey] = useState('')
+  const [modelId, setModelId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleSave = async () => {
     if (!apiKey.trim()) {
       setError('API key is required')
+      return
+    }
+
+    if (showModelInput && !modelId.trim()) {
+      setError('Model name is required')
       return
     }
 
@@ -45,8 +53,9 @@ export function ApiKeyDialog({
       const result = await window.electronAPI.provider.saveApiKey(providerId, apiKey.trim())
       if (result.ok) {
         setApiKey('')
+        setModelId('')
         onOpenChange(false)
-        onSuccess?.()
+        onSuccess?.(showModelInput ? modelId.trim() : undefined)
       } else {
         setError(result.error ?? 'Failed to save API key')
       }
@@ -61,6 +70,7 @@ export function ApiKeyDialog({
   const handleClose = (isOpen: boolean) => {
     if (!isOpen) {
       setApiKey('')
+      setModelId('')
       setError(null)
     }
     onOpenChange(isOpen)
@@ -94,10 +104,31 @@ export function ApiKeyDialog({
                 }
               }}
             />
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
           </div>
+
+          {showModelInput && (
+            <div className="space-y-2">
+              <Label htmlFor="model-id">Model</Label>
+              <Input
+                id="model-id"
+                value={modelId}
+                onChange={(e) => setModelId(e.target.value)}
+                placeholder="anthropic/claude-sonnet-4"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !saving) {
+                    handleSave()
+                  }
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter the model identifier from your provider (e.g. anthropic/claude-sonnet-4)
+              </p>
+            </div>
+          )}
+
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
 
           <p className="text-xs text-muted-foreground">
             Your API key is stored locally in <code className="bg-muted px-1 rounded">~/.super-multica/credentials.json5</code>
@@ -108,7 +139,7 @@ export function ApiKeyDialog({
           <Button variant="outline" onClick={() => handleClose(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving || !apiKey.trim()}>
+          <Button onClick={handleSave} disabled={saving || !apiKey.trim() || (showModelInput && !modelId.trim())}>
             {saving && <HugeiconsIcon icon={Loading03Icon} className="size-4 animate-spin mr-2" />}
             Save
           </Button>
