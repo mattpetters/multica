@@ -13,6 +13,8 @@
     "mu": "pnpm --filter @multica/cli dev",
     "dev": "pnpm --filter @multica/desktop dev",
     "dev:desktop": "pnpm --filter @multica/desktop dev",
+    "dev:desktop:reset": "rm -rf ~/.super-multica && echo '✓ Deleted ~/.super-multica - Fresh install state restored'",
+    "dev:desktop:fresh": "pnpm dev:desktop:reset && pnpm dev:desktop",
     "dev:desktop:onboarding": "pnpm --filter @multica/desktop dev:onboarding",
     "dev:gateway": "pnpm --filter @multica/gateway dev",
     "dev:web": "pnpm --filter @multica/web dev",
