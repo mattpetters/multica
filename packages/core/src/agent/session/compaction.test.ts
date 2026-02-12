@@ -44,7 +44,7 @@ vi.mock("../context-window/index.js", async () => {
       const systemPromptTokens = params.systemPrompt ? 100 : 0;
       const reserve = params.reserveTokens ?? 1024;
       const availableTokens = Math.max(0, params.contextWindowTokens - systemPromptTokens - reserve);
-      const utilizationRatio = availableTokens > 0 ? (messageTokens * 1.2) / availableTokens : 1;
+      const utilizationRatio = availableTokens > 0 ? (messageTokens * 1.5) / availableTokens : 1;
 
       return {
         messageTokens,
@@ -234,7 +234,7 @@ describe("compaction", () => {
         // 100 * 10 = 1000 message tokens
         // System: 100 tokens, Reserve: 1024
         // Available: 2000 - 100 - 1024 = 876
-        // Utilization: (1000 * 1.2) / 876 = 1.37 > 0.8
+        // Utilization: (1000 * 1.5) / 876 = 1.71 > 0.8
         const result = compactMessages(messages, {
           mode: "tokens",
           contextWindowTokens: 2000,
@@ -249,7 +249,7 @@ describe("compaction", () => {
         const messages = createMessages(5);
         // 5 * 10 = 50 message tokens
         // Available: 10000 - 100 - 1024 = 8876
-        // Utilization: (50 * 1.2) / 8876 = 0.007 < 0.8
+        // Utilization: (50 * 1.5) / 8876 = 0.008 < 0.8
         const result = compactMessages(messages, {
           mode: "tokens",
           contextWindowTokens: 10000,
