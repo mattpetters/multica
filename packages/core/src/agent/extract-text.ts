@@ -16,7 +16,7 @@ export function hasToolUse(message: AgentMessage | undefined): boolean {
   if (!message || typeof message !== "object" || !("content" in message)) return false;
   const content = (message as { content?: Array<{ type: string }> }).content;
   if (!Array.isArray(content)) return false;
-  return content.some((c) => c.type === "tool_use");
+  return content.some((c) => c.type === "toolCall" || c.type === "tool_use");
 }
 
 /** Extract thinking/reasoning content from an AgentMessage */
