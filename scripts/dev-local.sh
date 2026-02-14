@@ -36,6 +36,8 @@ echo "Starting local dev environment..."
 echo "  Gateway:  http://localhost:4000 (Telegram long-polling mode)"
 echo "  Web:      http://localhost:3000 (OAuth login)"
 echo "  Desktop:  connecting to local Gateway + Web"
+echo "  Data dir: ~/.super-multica-dev (isolated from production)"
+echo "  Workspace: ~/Documents/Multica-dev (isolated from production)"
 echo ""
 
 # Build shared packages first
@@ -49,6 +51,6 @@ exec pnpm concurrently \
   "pnpm --filter @multica/types dev" \
   "pnpm --filter @multica/utils dev" \
   "pnpm --filter @multica/core dev" \
-  "PORT=4000 MULTICA_RUN_LOG=1 pnpm --filter @multica/gateway dev" \
+  "PORT=4000 SMC_DATA_DIR=~/.super-multica-dev MULTICA_WORKSPACE_DIR=~/Documents/Multica-dev MULTICA_RUN_LOG=1 pnpm --filter @multica/gateway dev" \
   "pnpm --filter @multica/web dev" \
-  "GATEWAY_URL=http://localhost:4000 MAIN_VITE_WEB_URL=http://localhost:3000 MULTICA_RUN_LOG=1 pnpm --filter @multica/desktop dev"
+  "GATEWAY_URL=http://localhost:4000 MAIN_VITE_WEB_URL=http://localhost:3000 SMC_DATA_DIR=~/.super-multica-dev MULTICA_WORKSPACE_DIR=~/Documents/Multica-dev MULTICA_RUN_LOG=1 pnpm --filter @multica/desktop dev"
