@@ -14,27 +14,6 @@ type Runtime struct {
 	Status   string `json:"status"`
 }
 
-// PairingSession represents a daemon pairing session.
-type PairingSession struct {
-	Token          string  `json:"token"`
-	DaemonID       string  `json:"daemon_id"`
-	DeviceName     string  `json:"device_name"`
-	RuntimeName    string  `json:"runtime_name"`
-	RuntimeType    string  `json:"runtime_type"`
-	RuntimeVersion string  `json:"runtime_version"`
-	WorkspaceID    *string `json:"workspace_id"`
-	Status         string  `json:"status"`
-	ApprovedAt     *string `json:"approved_at"`
-	ClaimedAt      *string `json:"claimed_at"`
-	ExpiresAt      string  `json:"expires_at"`
-	LinkURL        *string `json:"link_url"`
-}
-
-// PersistedConfig is the JSON structure saved to ~/.multica/daemon.json.
-type PersistedConfig struct {
-	WorkspaceID string `json:"workspace_id"`
-}
-
 // Task represents a claimed task from the server.
 type Task struct {
 	ID      string      `json:"id"`
@@ -49,6 +28,7 @@ type TaskContext struct {
 	Agent            AgentContext   `json:"agent"`
 	Runtime          RuntimeContext `json:"runtime"`
 	WorkspaceContext string         `json:"workspace_context,omitempty"`
+	RepoPath         string         `json:"repo_path,omitempty"`
 }
 
 // IssueContext holds issue details for task execution.

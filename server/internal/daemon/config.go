@@ -1,8 +1,6 @@
 package daemon
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -14,23 +12,20 @@ import (
 
 const (
 	DefaultServerURL         = "ws://localhost:8080/ws"
-	DefaultDaemonConfigPath  = ".multica/daemon.json"
 	DefaultPollInterval      = 3 * time.Second
 	DefaultHeartbeatInterval = 15 * time.Second
 	DefaultAgentTimeout      = 2 * time.Hour
 	DefaultRuntimeName       = "Local Agent"
+	DefaultConfigReloadInterval = 5 * time.Second
 )
 
 // Config holds all daemon configuration.
 type Config struct {
 	ServerBaseURL     string
-	ConfigPath        string
-	WorkspaceID       string
 	DaemonID          string
 	DeviceName        string
 	RuntimeName       string
 	Agents            map[string]AgentEntry // "claude" -> entry, "codex" -> entry
-	ReposRoot         string                // parent directory containing all repos
 	WorkspacesRoot    string                // base path for execution envs (default: ~/multica_workspaces)
 	KeepEnvAfterTask  bool                  // preserve env after task for debugging
 	PollInterval      time.Duration
@@ -42,10 +37,7 @@ type Config struct {
 // Zero values are ignored and the env/default value is used instead.
 type Overrides struct {
 	ServerURL         string
-	WorkspaceID       string
-	ReposRoot         string
 	WorkspacesRoot    string
-	ConfigPath        string
 	PollInterval      time.Duration
 	HeartbeatInterval time.Duration
 	AgentTimeout      time.Duration
@@ -54,8 +46,8 @@ type Overrides struct {
 	RuntimeName       string
 }
 
-// LoadConfig builds the daemon configuration from environment variables,
-// persisted config, and optional CLI flag overrides.
+// LoadConfig builds the daemon configuration from environment variables
+// and optional CLI flag overrides.
 func LoadConfig(overrides Overrides) (Config, error) {
 	// Server URL: override > env > default
 	rawServerURL := envOrDefault("MULTICA_SERVER_URL", DefaultServerURL)
@@ -65,31 +57,6 @@ func LoadConfig(overrides Overrides) (Config, error) {
 	serverBaseURL, err := NormalizeServerBaseURL(rawServerURL)
 	if err != nil {
 		return Config{}, err
-	}
-
-	// Config path
-	rawConfigPath := strings.TrimSpace(os.Getenv("MULTICA_DAEMON_CONFIG"))
-	if overrides.ConfigPath != "" {
-		rawConfigPath = overrides.ConfigPath
-	}
-	configPath, err := resolveDaemonConfigPath(rawConfigPath)
-	if err != nil {
-		return Config{}, err
-	}
-
-	// Load persisted config
-	persisted, err := LoadPersistedConfig(configPath)
-	if err != nil {
-		return Config{}, err
-	}
-
-	// Workspace ID: override > env > persisted
-	workspaceID := strings.TrimSpace(os.Getenv("MULTICA_WORKSPACE_ID"))
-	if workspaceID == "" {
-		workspaceID = persisted.WorkspaceID
-	}
-	if overrides.WorkspaceID != "" {
-		workspaceID = overrides.WorkspaceID
 	}
 
 	// Probe available agent CLIs
@@ -116,22 +83,6 @@ func LoadConfig(overrides Overrides) (Config, error) {
 	host, err := os.Hostname()
 	if err != nil || strings.TrimSpace(host) == "" {
 		host = "local-machine"
-	}
-
-	// Repos root: override > env > cwd
-	reposRoot := strings.TrimSpace(os.Getenv("MULTICA_REPOS_ROOT"))
-	if overrides.ReposRoot != "" {
-		reposRoot = overrides.ReposRoot
-	}
-	if reposRoot == "" {
-		reposRoot, err = os.Getwd()
-		if err != nil {
-			return Config{}, fmt.Errorf("resolve working directory: %w", err)
-		}
-	}
-	reposRoot, err = filepath.Abs(reposRoot)
-	if err != nil {
-		return Config{}, fmt.Errorf("resolve absolute repos root: %w", err)
 	}
 
 	// Durations: override > env > default
@@ -181,12 +132,11 @@ func LoadConfig(overrides Overrides) (Config, error) {
 		workspacesRoot = overrides.WorkspacesRoot
 	}
 	if workspacesRoot == "" {
-		home, _ := os.UserHomeDir()
-		if home != "" {
-			workspacesRoot = filepath.Join(home, "multica_workspaces")
-		} else {
-			workspacesRoot = filepath.Join(reposRoot, "multica_workspaces")
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return Config{}, fmt.Errorf("resolve home directory: %w (set MULTICA_WORKSPACES_ROOT to override)", err)
 		}
+		workspacesRoot = filepath.Join(home, "multica_workspaces")
 	}
 	workspacesRoot, err = filepath.Abs(workspacesRoot)
 	if err != nil {
@@ -198,13 +148,10 @@ func LoadConfig(overrides Overrides) (Config, error) {
 
 	return Config{
 		ServerBaseURL:     serverBaseURL,
-		ConfigPath:        configPath,
-		WorkspaceID:       workspaceID,
 		DaemonID:          daemonID,
 		DeviceName:        deviceName,
 		RuntimeName:       runtimeName,
 		Agents:            agents,
-		ReposRoot:         reposRoot,
 		WorkspacesRoot:    workspacesRoot,
 		KeepEnvAfterTask:  keepEnv,
 		PollInterval:      pollInterval,
@@ -235,46 +182,4 @@ func NormalizeServerBaseURL(raw string) (string, error) {
 	u.RawQuery = ""
 	u.Fragment = ""
 	return strings.TrimRight(u.String(), "/"), nil
-}
-
-func resolveDaemonConfigPath(raw string) (string, error) {
-	if raw != "" {
-		return filepath.Abs(raw)
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("resolve daemon config path: %w", err)
-	}
-	return filepath.Join(home, DefaultDaemonConfigPath), nil
-}
-
-// LoadPersistedConfig reads the daemon config from disk.
-func LoadPersistedConfig(path string) (PersistedConfig, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return PersistedConfig{}, nil
-		}
-		return PersistedConfig{}, fmt.Errorf("read daemon config: %w", err)
-	}
-	var cfg PersistedConfig
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return PersistedConfig{}, fmt.Errorf("parse daemon config: %w", err)
-	}
-	return cfg, nil
-}
-
-// SavePersistedConfig writes the daemon config to disk.
-func SavePersistedConfig(path string, cfg PersistedConfig) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create daemon config directory: %w", err)
-	}
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode daemon config: %w", err)
-	}
-	if err := os.WriteFile(path, append(data, '\n'), 0o600); err != nil {
-		return fmt.Errorf("write daemon config: %w", err)
-	}
-	return nil
 }

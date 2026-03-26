@@ -115,7 +115,7 @@ dev:
 	cd server && go run ./cmd/server
 
 daemon:
-	cd server && MULTICA_REPOS_ROOT="${MULTICA_REPOS_ROOT:-$(abspath .)}" go run ./cmd/multica daemon
+	cd server && go run ./cmd/multica daemon
 
 cli:
 	cd server && go run ./cmd/multica $(ARGS)

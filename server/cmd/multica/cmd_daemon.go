@@ -22,8 +22,6 @@ var daemonCmd = &cobra.Command{
 
 func init() {
 	f := daemonCmd.Flags()
-	f.String("repos-root", "", "Base directory for task repositories (env: MULTICA_REPOS_ROOT)")
-	f.String("config-path", "", "Path to daemon config file (env: MULTICA_DAEMON_CONFIG)")
 	f.String("daemon-id", "", "Unique daemon identifier (env: MULTICA_DAEMON_ID)")
 	f.String("device-name", "", "Human-readable device name (env: MULTICA_DAEMON_DEVICE_NAME)")
 	f.String("runtime-name", "", "Runtime display name (env: MULTICA_AGENT_RUNTIME_NAME)")
@@ -35,9 +33,6 @@ func init() {
 func runDaemon(cmd *cobra.Command, _ []string) error {
 	overrides := daemon.Overrides{
 		ServerURL:   cli.FlagOrEnv(cmd, "server-url", "MULTICA_SERVER_URL", ""),
-		WorkspaceID: cli.FlagOrEnv(cmd, "workspace-id", "MULTICA_WORKSPACE_ID", ""),
-		ReposRoot:   flagString(cmd, "repos-root"),
-		ConfigPath:  flagString(cmd, "config-path"),
 		DaemonID:    flagString(cmd, "daemon-id"),
 		DeviceName:  flagString(cmd, "device-name"),
 		RuntimeName: flagString(cmd, "runtime-name"),
@@ -73,4 +68,3 @@ func flagString(cmd *cobra.Command, name string) string {
 	val, _ := cmd.Flags().GetString(name)
 	return val
 }
-

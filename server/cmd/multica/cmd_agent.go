@@ -87,11 +87,7 @@ func resolveWorkspaceID(cmd *cobra.Command) string {
 		return val
 	}
 	cfg, _ := cli.LoadCLIConfig()
-	if cfg.WorkspaceID != "" {
-		return cfg.WorkspaceID
-	}
-	// Fallback: try daemon.json for workspace_id
-	return cli.LoadWorkspaceIDFromDaemonConfig()
+	return cfg.WorkspaceID
 }
 
 func runAgentList(cmd *cobra.Command, _ []string) error {

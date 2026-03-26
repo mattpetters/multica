@@ -21,7 +21,7 @@ const (
 // PrepareParams holds all inputs needed to set up an execution environment.
 type PrepareParams struct {
 	WorkspacesRoot string           // base path for all envs (e.g., ~/multica_workspaces)
-	ReposRoot      string           // source git repo (for worktree creation)
+	RepoPath       string           // source git repo path (for worktree creation), provided per-task by server
 	TaskID         string           // task UUID — used for directory name
 	AgentName      string           // for git branch naming only
 	Task           TaskContextForEnv // context data for writing files
@@ -100,8 +100,8 @@ func Prepare(params PrepareParams, logger *slog.Logger) (*Environment, error) {
 	}
 
 	// Detect git repo and set up worktree if available.
-	if params.ReposRoot != "" {
-		if gitRoot, ok := detectGitRepo(params.ReposRoot); ok {
+	if params.RepoPath != "" {
+		if gitRoot, ok := detectGitRepo(params.RepoPath); ok {
 			branchName := fmt.Sprintf("agent/%s/%s", sanitizeName(params.AgentName), shortID(params.TaskID))
 
 			// Get the default branch as base ref.

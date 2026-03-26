@@ -21,6 +21,28 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
+import type { User } from "@/shared/types";
+
+function validateCliCallback(cliCallback: string): boolean {
+  try {
+    const cbUrl = new URL(cliCallback);
+    if (cbUrl.protocol !== "http:") return false;
+    if (cbUrl.hostname !== "localhost" && cbUrl.hostname !== "127.0.0.1")
+      return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function redirectToCliCallback(
+  cliCallback: string,
+  token: string,
+  cliState: string
+) {
+  const separator = cliCallback.includes("?") ? "&" : "?";
+  window.location.href = `${cliCallback}${separator}token=${encodeURIComponent(token)}&state=${encodeURIComponent(cliState)}`;
+}
 
 function LoginPageContent() {
   const router = useRouter();
@@ -29,18 +51,53 @@ function LoginPageContent() {
   const hydrateWorkspace = useWorkspaceStore((s) => s.hydrateWorkspace);
   const searchParams = useSearchParams();
 
-  const [step, setStep] = useState<"email" | "code">("email");
+  const [step, setStep] = useState<"email" | "code" | "cli_confirm">("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [existingUser, setExistingUser] = useState<User | null>(null);
+
+  // Check for existing session when CLI callback is present.
+  useEffect(() => {
+    const cliCallback = searchParams.get("cli_callback");
+    if (!cliCallback) return;
+
+    const token = localStorage.getItem("multica_token");
+    if (!token) return;
+
+    if (!validateCliCallback(cliCallback)) return;
+
+    // Verify the existing token is still valid.
+    api.setToken(token);
+    api
+      .getMe()
+      .then((user) => {
+        setExistingUser(user);
+        setStep("cli_confirm");
+      })
+      .catch(() => {
+        // Token expired/invalid — clear and fall through to normal login.
+        api.setToken(null);
+        localStorage.removeItem("multica_token");
+      });
+  }, [searchParams]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
     return () => clearTimeout(timer);
   }, [cooldown]);
+
+  const handleCliAuthorize = async () => {
+    const cliCallback = searchParams.get("cli_callback");
+    const token = localStorage.getItem("multica_token");
+    if (!cliCallback || !token) return;
+    const cliState = searchParams.get("cli_state") || "";
+    setSubmitting(true);
+    redirectToCliCallback(cliCallback, token, cliState);
+  };
 
   const handleSendCode = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -57,7 +114,9 @@ function LoginPageContent() {
       setCooldown(10);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to send code. Make sure the server is running."
+        err instanceof Error
+          ? err.message
+          : "Failed to send code. Make sure the server is running."
       );
     } finally {
       setSubmitting(false);
@@ -72,27 +131,14 @@ function LoginPageContent() {
       try {
         const cliCallback = searchParams.get("cli_callback");
         if (cliCallback) {
-          try {
-            const cbUrl = new URL(cliCallback);
-            if (cbUrl.protocol !== "http:") {
-              setError("Invalid callback URL");
-              setSubmitting(false);
-              return;
-            }
-            if (cbUrl.hostname !== "localhost" && cbUrl.hostname !== "127.0.0.1") {
-              setError("Invalid callback URL");
-              setSubmitting(false);
-              return;
-            }
-          } catch {
+          if (!validateCliCallback(cliCallback)) {
             setError("Invalid callback URL");
             setSubmitting(false);
             return;
           }
           const { token } = await api.verifyCode(email, value);
           const cliState = searchParams.get("cli_state") || "";
-          const separator = cliCallback.includes("?") ? "&" : "?";
-          window.location.href = `${cliCallback}${separator}token=${encodeURIComponent(token)}&state=${encodeURIComponent(cliState)}`;
+          redirectToCliCallback(cliCallback, token, cliState);
           return;
         }
 
@@ -123,6 +169,46 @@ function LoginPageContent() {
       );
     }
   };
+
+  // CLI confirm step: user is already logged in, just authorize.
+  if (step === "cli_confirm" && existingUser) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-full max-w-sm">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Authorize CLI</CardTitle>
+            <CardDescription>
+              Allow the CLI to access Multica as{" "}
+              <span className="font-medium text-foreground">
+                {existingUser.email}
+              </span>
+              ?
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <Button
+              onClick={handleCliAuthorize}
+              disabled={submitting}
+              className="w-full"
+              size="lg"
+            >
+              {submitting ? "Authorizing..." : "Authorize"}
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => {
+                setExistingUser(null);
+                setStep("email");
+              }}
+            >
+              Use a different account
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (step === "code") {
     return (

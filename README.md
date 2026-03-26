@@ -100,6 +100,79 @@ That keeps one Docker container and one volume, while still isolating schema and
 | `make setup-main` / `make start-main` | Force use of the shared main `.env` |
 | `make setup-worktree` / `make start-worktree` | Force use of isolated `.env.worktree` |
 
+## CLI (`multica`)
+
+The CLI manages authentication, workspace configuration, and the local agent daemon.
+
+### Install
+
+```bash
+brew tap multica-ai/tap
+brew install multica-cli
+```
+
+Or build from source:
+
+```bash
+make build
+cp server/bin/multica /usr/local/bin/multica   # or ~/.local/bin/multica
+```
+
+### Authentication
+
+```bash
+multica auth login          # Open browser to authenticate (one-click if already logged in)
+multica auth login --token  # Paste a personal access token manually
+multica auth status         # Show current auth status
+multica auth logout         # Remove stored token
+```
+
+Credentials are saved to `~/.multica/config.json`.
+
+### Workspaces
+
+```bash
+multica workspace list      # List all workspaces you belong to
+```
+
+### Daemon Watch List
+
+The daemon monitors one or more workspaces for tasks. Manage which workspaces are watched:
+
+```bash
+multica watch <workspace-id>    # Add a workspace to the watch list
+multica unwatch <workspace-id>  # Remove a workspace from the watch list
+multica watches                 # Show the current watch list
+```
+
+The watch list is stored in `~/.multica/config.json`. Changes are picked up by a running daemon within 5 seconds (hot-reload).
+
+### Local Agent Daemon
+
+The daemon polls watched workspaces for tasks and executes them using locally installed AI agents (Claude Code, Codex).
+
+```bash
+# 1. Authenticate
+multica auth login
+
+# 2. Add workspaces to watch
+multica watch <workspace-id>
+
+# 3. Start the daemon
+multica daemon
+```
+
+The daemon auto-detects available agent CLIs (`claude`, `codex`) on your PATH. When a task is claimed, it creates an isolated execution environment, runs the agent, and reports results back to the server.
+
+### Other Commands
+
+```bash
+multica agent list          # List agents in the current workspace
+multica runtime list        # List registered runtimes
+multica config show         # Show CLI configuration
+multica version             # Show CLI version
+```
+
 ## Environment Variables
 
 See [`.env.example`](.env.example) for all available variables:
@@ -110,30 +183,13 @@ See [`.env.example`](.env.example) for all available variables:
 - `PORT` — Backend server port (default: 8080)
 - `FRONTEND_PORT` / `FRONTEND_ORIGIN` — Frontend port and browser origin
 - `JWT_SECRET` — JWT signing secret
-- `MULTICA_APP_URL` — Browser origin used when generating local runtime pairing links
-- `MULTICA_DAEMON_CONFIG` — Optional path for the daemon's persisted local config
-- `MULTICA_WORKSPACE_ID` — Optional dev override for the workspace id; normal usage should rely on browser pairing instead
-- `MULTICA_DAEMON_ID` / `MULTICA_DAEMON_DEVICE_NAME` — Stable daemon identity for local runtime registration
-- `MULTICA_CODEX_PATH` / `MULTICA_CODEX_MODEL` — Codex executable and optional model override for local task execution
-- `MULTICA_CODEX_WORKDIR` — Default working directory used by the local Codex runtime
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth (optional)
+- `MULTICA_APP_URL` — Browser origin for CLI login callback (default: `http://localhost:3000`)
+- `MULTICA_DAEMON_ID` / `MULTICA_DAEMON_DEVICE_NAME` — Stable daemon identity for runtime registration
+- `MULTICA_CLAUDE_PATH` / `MULTICA_CLAUDE_MODEL` — Claude Code executable and optional model override
+- `MULTICA_CODEX_PATH` / `MULTICA_CODEX_MODEL` — Codex executable and optional model override
+- `MULTICA_WORKSPACES_ROOT` — Base directory for agent execution environments (default: `~/multica_workspaces`)
 - `NEXT_PUBLIC_API_URL` — Frontend → backend API URL
 - `NEXT_PUBLIC_WS_URL` — Frontend → backend WebSocket URL
-
-## Local Codex Daemon
-
-The local daemon currently supports one local runtime type: `codex`.
-
-1. Start the daemon with `make daemon`.
-2. If the daemon does not already know its workspace, it prints a pairing link in the terminal.
-3. Open that link in the browser, sign in, and choose the workspace that should own the local Codex runtime.
-4. The daemon stores the approved workspace locally in `MULTICA_DAEMON_CONFIG` or `~/.multica/daemon.json`.
-5. The daemon registers the local Codex runtime via `/api/daemon/register`.
-6. Create an agent in Multica and bind it to that runtime.
-7. Assign an issue to the agent and move the issue to `todo`.
-8. The daemon claims the task, runs `codex exec`, and reports the final comment back to the issue.
-
-For local development you can still set `MULTICA_WORKSPACE_ID` directly to skip pairing, but that should be treated as a debug shortcut rather than the normal flow.
 
 ## Local Development Notes
 
