@@ -1,5 +1,7 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { arrayMove } from "@dnd-kit/sortable";
+import { createPersistStorage, defaultStorage } from "@multica/core/platform";
 import type { DataRouter } from "react-router-dom";
 import { createTabRouter } from "../routes";
 
@@ -33,6 +35,8 @@ interface TabStore {
   updateTab: (tabId: string, patch: Partial<Pick<Tab, "path" | "title" | "icon">>) => void;
   /** Update a tab's history tracking. */
   updateTabHistory: (tabId: string, historyIndex: number, historyLength: number) => void;
+  /** Reorder tabs by moving one from fromIndex to toIndex. Preserves router/history. */
+  moveTab: (fromIndex: number, toIndex: number) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -150,10 +154,16 @@ export const useTabStore = create<TabStore>()(
       ),
     }));
   },
+
+  moveTab(fromIndex, toIndex) {
+    if (fromIndex === toIndex) return;
+    set((s) => ({ tabs: arrayMove(s.tabs, fromIndex, toIndex) }));
+  },
     }),
     {
       name: "multica_tabs",
       version: 1,
+      storage: createJSONStorage(() => createPersistStorage(defaultStorage)),
       partialize: (state) => ({
         tabs: state.tabs.map(
           ({ router, historyIndex, historyLength, ...rest }) => rest,
