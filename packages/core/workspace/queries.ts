@@ -5,7 +5,6 @@ export const workspaceKeys = {
   all: (wsId: string) => ["workspaces", wsId] as const,
   list: () => ["workspaces", "list"] as const,
   members: (wsId: string) => ["workspaces", wsId, "members"] as const,
-  onlineMembers: (wsId: string) => ["workspaces", wsId, "online-members"] as const,
   agents: (wsId: string) => ["workspaces", wsId, "agents"] as const,
   skills: (wsId: string) => ["workspaces", wsId, "skills"] as const,
   assigneeFrequency: (wsId: string) => ["workspaces", wsId, "assignee-frequency"] as const,
@@ -22,16 +21,6 @@ export function memberListOptions(wsId: string) {
   return queryOptions({
     queryKey: workspaceKeys.members(wsId),
     queryFn: () => api.listMembers(wsId),
-  });
-}
-
-export function onlineMembersOptions(wsId: string) {
-  return queryOptions({
-    queryKey: workspaceKeys.onlineMembers(wsId),
-    queryFn: async () => {
-      const res = await api.getOnlineMembers(wsId);
-      return res.user_ids;
-    },
   });
 }
 

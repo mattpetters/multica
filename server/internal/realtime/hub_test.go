@@ -60,19 +60,6 @@ func connectWS(t *testing.T, server *httptest.Server) *websocket.Conn {
 	return conn
 }
 
-// readOneMessage reads and discards exactly one message from the connection.
-// Used to consume the member:online presence event sent when the first client
-// for a user registers.
-func readOneMessage(t *testing.T, conn *websocket.Conn) {
-	t.Helper()
-	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-	_, _, err := conn.ReadMessage()
-	if err != nil {
-		t.Fatalf("expected presence message but got error: %v", err)
-	}
-	conn.SetReadDeadline(time.Time{})
-}
-
 // totalClients counts all clients across all rooms.
 func totalClients(hub *Hub) int {
 	hub.mu.RLock()
@@ -105,12 +92,9 @@ func TestHub_Broadcast(t *testing.T) {
 
 	conn1 := connectWS(t, server)
 	defer conn1.Close()
-	// First connection triggers member:online; consume it before proceeding.
-	time.Sleep(50 * time.Millisecond)
-	readOneMessage(t, conn1)
-
 	conn2 := connectWS(t, server)
 	defer conn2.Close()
+
 	time.Sleep(50 * time.Millisecond)
 
 	msg := []byte(`{"type":"issue:created","data":"test"}`)
@@ -163,13 +147,7 @@ func TestHub_BroadcastToMultipleClients(t *testing.T) {
 
 	const numClients = 5
 	conns := make([]*websocket.Conn, numClients)
-	conns[0] = connectWS(t, server)
-	defer conns[0].Close()
-	// First connection triggers member:online; consume it before adding more clients.
-	time.Sleep(50 * time.Millisecond)
-	readOneMessage(t, conns[0])
-
-	for i := 1; i < numClients; i++ {
+	for i := 0; i < numClients; i++ {
 		conns[i] = connectWS(t, server)
 		defer conns[i].Close()
 	}
@@ -204,7 +182,6 @@ func TestHub_MultipleBroadcasts(t *testing.T) {
 	defer conn.Close()
 
 	time.Sleep(50 * time.Millisecond)
-	readOneMessage(t, conn) // consume member:online presence event
 
 	messages := []string{
 		`{"type":"issue:created"}`,

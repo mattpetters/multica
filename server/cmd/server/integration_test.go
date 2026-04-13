@@ -758,14 +758,6 @@ func TestWebSocketIntegration(t *testing.T) {
 	// Allow Hub goroutine to process the register and add client to room
 	time.Sleep(100 * time.Millisecond)
 
-	// Consume the member:online presence event sent on first connection
-	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-	_, _, err = conn.ReadMessage()
-	if err != nil {
-		t.Fatalf("failed to read presence message: %v", err)
-	}
-	conn.SetReadDeadline(time.Time{})
-
 	// Create an issue — this should trigger a WebSocket broadcast
 	resp := authRequest(t, "POST", "/api/issues?workspace_id="+testWorkspaceID, map[string]any{
 		"title":  "WebSocket test issue",

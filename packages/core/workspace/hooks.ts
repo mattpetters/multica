@@ -2,13 +2,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useWorkspaceId } from "../hooks";
-import { memberListOptions, agentListOptions, onlineMembersOptions } from "./queries";
+import { memberListOptions, agentListOptions } from "./queries";
 
 export function useActorName() {
   const wsId = useWorkspaceId();
   const { data: members = [] } = useQuery(memberListOptions(wsId));
   const { data: agents = [] } = useQuery(agentListOptions(wsId));
-  const { data: onlineUserIds } = useQuery(onlineMembersOptions(wsId));
 
   const getMemberName = (userId: string) => {
     const m = members.find((m) => m.user_id === userId);
@@ -42,18 +41,5 @@ export function useActorName() {
     return null;
   };
 
-  const getActorOnlineStatus = (type: string, id: string): boolean | undefined => {
-    if (type === "agent") {
-      const agent = agents.find((a) => a.id === id);
-      if (!agent) return undefined;
-      return agent.status !== "offline";
-    }
-    if (type === "member") {
-      if (!onlineUserIds) return undefined;
-      return onlineUserIds.includes(id);
-    }
-    return undefined;
-  };
-
-  return { getMemberName, getAgentName, getActorName, getActorInitials, getActorAvatarUrl, getActorOnlineStatus };
+  return { getMemberName, getAgentName, getActorName, getActorInitials, getActorAvatarUrl };
 }

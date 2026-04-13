@@ -317,13 +317,6 @@ func (h *Handler) ListMembersWithUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// GetOnlineMembers returns the user IDs of members currently connected via WebSocket.
-func (h *Handler) GetOnlineMembers(w http.ResponseWriter, r *http.Request) {
-	workspaceID := workspaceIDFromURL(r, "id")
-	userIDs := h.Hub.OnlineUserIDs(workspaceID)
-	writeJSON(w, http.StatusOK, map[string]any{"user_ids": userIDs})
-}
-
 type CreateMemberRequest struct {
 	Email string `json:"email"`
 	Role  string `json:"role"`

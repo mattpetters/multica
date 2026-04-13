@@ -2,7 +2,6 @@ package realtime
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"os"
@@ -121,14 +120,6 @@ func (h *Hub) Run() {
 			if h.rooms[room] == nil {
 				h.rooms[room] = make(map[*Client]bool)
 			}
-			// Check if user was already online in this workspace
-			wasOnline := false
-			for c := range h.rooms[room] {
-				if c.userID == client.userID {
-					wasOnline = true
-					break
-				}
-			}
 			h.rooms[room][client] = true
 			total := 0
 			for _, r := range h.rooms {
@@ -136,10 +127,6 @@ func (h *Hub) Run() {
 			}
 			h.mu.Unlock()
 			slog.Info("ws client connected", "workspace_id", room, "total_clients", total)
-
-			if !wasOnline {
-				h.broadcastPresence(room, client.userID, true)
-			}
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -153,26 +140,12 @@ func (h *Hub) Run() {
 					}
 				}
 			}
-			// Check if user still has connections in this workspace
-			stillOnline := false
-			if clients, ok := h.rooms[room]; ok {
-				for c := range clients {
-					if c.userID == client.userID {
-						stillOnline = true
-						break
-					}
-				}
-			}
 			total := 0
 			for _, r := range h.rooms {
 				total += len(r)
 			}
 			h.mu.Unlock()
 			slog.Info("ws client disconnected", "workspace_id", room, "total_clients", total)
-
-			if !stillOnline {
-				h.broadcastPresence(room, client.userID, false)
-			}
 
 		case message := <-h.broadcast:
 			// Global broadcast for daemon events (no workspace filtering)
@@ -297,42 +270,6 @@ func (h *Hub) SendToUser(userID string, message []byte, excludeWorkspace ...stri
 // Broadcast sends a message to all connected clients (used for daemon events).
 func (h *Hub) Broadcast(message []byte) {
 	h.broadcast <- message
-}
-
-// OnlineUserIDs returns the unique user IDs with active WebSocket connections
-// in the given workspace.
-func (h *Hub) OnlineUserIDs(workspaceID string) []string {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	seen := make(map[string]bool)
-	if clients, ok := h.rooms[workspaceID]; ok {
-		for c := range clients {
-			seen[c.userID] = true
-		}
-	}
-
-	ids := make([]string, 0, len(seen))
-	for id := range seen {
-		ids = append(ids, id)
-	}
-	return ids
-}
-
-// broadcastPresence sends a member:online or member:offline event to the workspace.
-func (h *Hub) broadcastPresence(workspaceID, userID string, online bool) {
-	eventType := "member:offline"
-	if online {
-		eventType = "member:online"
-	}
-	data, err := json.Marshal(map[string]any{
-		"type":    eventType,
-		"payload": map[string]any{"user_id": userID},
-	})
-	if err != nil {
-		return
-	}
-	h.BroadcastToWorkspace(workspaceID, data)
 }
 
 // HandleWebSocket upgrades an HTTP connection to WebSocket with JWT, PAT, or cookie auth.

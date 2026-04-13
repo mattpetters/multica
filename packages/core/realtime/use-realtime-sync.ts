@@ -25,8 +25,6 @@ import type {
   MemberAddedPayload,
   WorkspaceDeletedPayload,
   MemberRemovedPayload,
-  MemberOnlinePayload,
-  MemberOfflinePayload,
   IssueUpdatedPayload,
   IssueCreatedPayload,
   IssueDeletedPayload,
@@ -135,7 +133,6 @@ export function useRealtimeSync(
       "issue_reaction:added", "issue_reaction:removed",
       "subscriber:added", "subscriber:removed",
       "daemon:heartbeat",
-      "member:online", "member:offline",
     ]);
 
     const unsubAny = ws.onAny((msg) => {
@@ -245,33 +242,6 @@ export function useRealtimeSync(
       if (issue_id) qc.invalidateQueries({ queryKey: issueKeys.subscribers(issue_id) });
     });
 
-    // --- Member presence handlers (optimistic cache updates) ---
-
-    const unsubMemberOnline = ws.on("member:online", (p) => {
-      const { user_id } = p as MemberOnlinePayload;
-      if (!user_id) return;
-      const wsId = workspaceStore.getState().workspace?.id;
-      if (wsId) {
-        qc.setQueryData<string[]>(workspaceKeys.onlineMembers(wsId), (old) => {
-          if (!old) return [user_id];
-          if (old.includes(user_id)) return old;
-          return [...old, user_id];
-        });
-      }
-    });
-
-    const unsubMemberOffline = ws.on("member:offline", (p) => {
-      const { user_id } = p as MemberOfflinePayload;
-      if (!user_id) return;
-      const wsId = workspaceStore.getState().workspace?.id;
-      if (wsId) {
-        qc.setQueryData<string[]>(workspaceKeys.onlineMembers(wsId), (old) => {
-          if (!old) return old;
-          return old.filter((id) => id !== user_id);
-        });
-      }
-    });
-
     // --- Side-effect handlers (toast, navigation) ---
 
     const unsubWsDeleted = ws.on("workspace:deleted", (p) => {
@@ -332,8 +302,6 @@ export function useRealtimeSync(
       unsubWsDeleted();
       unsubMemberRemoved();
       unsubMemberAdded();
-      unsubMemberOnline();
-      unsubMemberOffline();
       timers.forEach(clearTimeout);
       timers.clear();
     };
@@ -352,7 +320,6 @@ export function useRealtimeSync(
           qc.invalidateQueries({ queryKey: inboxKeys.all(wsId) });
           qc.invalidateQueries({ queryKey: workspaceKeys.agents(wsId) });
           qc.invalidateQueries({ queryKey: workspaceKeys.members(wsId) });
-          qc.invalidateQueries({ queryKey: workspaceKeys.onlineMembers(wsId) });
           qc.invalidateQueries({ queryKey: workspaceKeys.skills(wsId) });
           qc.invalidateQueries({ queryKey: projectKeys.all(wsId) });
           qc.invalidateQueries({ queryKey: runtimeKeys.all(wsId) });

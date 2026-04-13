@@ -162,7 +162,6 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Route
 					r.Use(middleware.RequireWorkspaceMemberFromURL(queries, "id"))
 					r.Get("/", h.GetWorkspace)
 					r.Get("/members", h.ListMembersWithUser)
-					r.Get("/members/online", h.GetOnlineMembers)
 					r.Post("/leave", h.LeaveWorkspace)
 				})
 				// Admin-level access

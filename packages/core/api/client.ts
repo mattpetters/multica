@@ -525,10 +525,6 @@ export class ApiClient {
     return this.fetch(`/api/workspaces/${workspaceId}/members`);
   }
 
-  async getOnlineMembers(workspaceId: string): Promise<{ user_ids: string[] }> {
-    return this.fetch(`/api/workspaces/${workspaceId}/members/online`);
-  }
-
   async createMember(workspaceId: string, data: CreateMemberRequest): Promise<MemberWithUser> {
     return this.fetch(`/api/workspaces/${workspaceId}/members`, {
       method: "POST",

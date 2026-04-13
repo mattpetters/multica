@@ -45,8 +45,6 @@ const (
 	EventMemberAdded   = "member:added"
 	EventMemberUpdated = "member:updated"
 	EventMemberRemoved = "member:removed"
-	EventMemberOnline  = "member:online"
-	EventMemberOffline = "member:offline"
 
 	// Subscriber events
 	EventSubscriberAdded   = "subscriber:added"
