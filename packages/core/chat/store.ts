@@ -70,6 +70,8 @@ export interface ContextAnchor {
 export interface ChatState {
   activeSessionId: string | null;
   selectedAgentId: string | null;
+  /** Messages queued for sending after the current task finishes. */
+  queuedMessages: string[];
   /** Drafts per session: sessionId (or DRAFT_NEW_SESSION) → markdown text. */
   inputDrafts: Record<string, string>;
   /**
@@ -87,6 +89,8 @@ export interface ChatState {
   lastAnchorLocation: { pathname: string; search: string } | null;
   setActiveSession: (id: string | null) => void;
   setSelectedAgentId: (id: string) => void;
+  queueMessage: (content: string) => void;
+  dequeueMessages: () => string[];
   /** sessionId accepts a real session UUID or DRAFT_NEW_SESSION. */
   setInputDraft: (sessionId: string, draft: string) => void;
   clearInputDraft: (sessionId: string) => void;
@@ -109,6 +113,7 @@ export function createChatStore(options: ChatStoreOptions) {
   const store = create<ChatState>((set, get) => ({
     activeSessionId: storage.getItem(wsKey(SESSION_STORAGE_KEY)),
     selectedAgentId: storage.getItem(wsKey(AGENT_STORAGE_KEY)),
+    queuedMessages: [],
     inputDrafts: readDrafts(storage, wsKey(DRAFTS_KEY)),
     focusMode: storage.getItem(FOCUS_MODE_KEY) === "true",
     lastAnchorLocation: null,
@@ -126,6 +131,15 @@ export function createChatStore(options: ChatStoreOptions) {
       logger.info("setSelectedAgentId", { from: get().selectedAgentId, to: id });
       storage.setItem(wsKey(AGENT_STORAGE_KEY), id);
       set({ selectedAgentId: id });
+    },
+    queueMessage: (content: string) => {
+      logger.info("queueMessage", { length: content.length });
+      set({ queuedMessages: [...get().queuedMessages, content] });
+    },
+    dequeueMessages: () => {
+      const msgs = get().queuedMessages;
+      set({ queuedMessages: [] });
+      return msgs;
     },
     setInputDraft: (sessionId, draft) => {
       // Debug level — onUpdate fires on every keystroke.

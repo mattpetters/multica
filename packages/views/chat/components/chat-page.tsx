@@ -113,6 +113,29 @@ export function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- markRead ref stable
   }, [activeSessionId, currentHasUnread]);
 
+  // Dequeue messages when a task finishes (pendingTaskId clears).
+  // The queueMessage path in handleSend pushes content here when the
+  // user types while a task is running. Once the task completes (WS
+  // chat:done or pending-task refetch returns empty), send queued
+  // messages sequentially.
+  const prevTaskIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevTaskIdRef.current && !pendingTaskId) {
+      const queued = useChatStore.getState().dequeueMessages();
+      if (queued.length > 0) {
+        apiLogger.info("dequeue: sending queued messages", { count: queued.length });
+        // Send each queued message sequentially.
+        void (async () => {
+          for (const content of queued) {
+            await handleSend(content);
+          }
+        })();
+      }
+    }
+    prevTaskIdRef.current = pendingTaskId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- we only care about pendingTaskId transitions
+  }, [pendingTaskId]);
+
   const { candidate: anchorCandidate } = useRouteAnchorCandidate(wsId);
 
   const handleSend = useCallback(
@@ -121,6 +144,14 @@ export function ChatPage() {
         apiLogger.warn("sendChatMessage skipped: no active agent");
         return;
       }
+
+      // If a task is running, queue the message instead of sending immediately.
+      if (pendingTaskId) {
+        apiLogger.info("sendChatMessage queued (task running)", { taskId: pendingTaskId });
+        useChatStore.getState().queueMessage(content);
+        return;
+      }
+
       const focusOn = useChatStore.getState().focusMode;
       const finalContent = focusOn && anchorCandidate
         ? `${buildAnchorMarkdown(anchorCandidate)}\n\n${content}`
@@ -165,19 +196,27 @@ export function ChatPage() {
       });
       qc.invalidateQueries({ queryKey: chatKeys.messages(sessionId) });
     },
-    [activeSessionId, activeAgent, anchorCandidate, createSession, setActiveSession, qc],
+    [activeSessionId, activeAgent, anchorCandidate, createSession, setActiveSession, qc, pendingTaskId],
   );
 
   const handleStop = useCallback(async () => {
     if (!pendingTaskId) return;
+    const sessionId = activeSessionId;
     try {
       await api.cancelTaskById(pendingTaskId);
     } catch (err) {
       apiLogger.warn("cancelTask.error", { taskId: pendingTaskId, err });
     }
-    if (activeSessionId) {
-      qc.setQueryData(chatKeys.pendingTask(activeSessionId), {});
-      qc.invalidateQueries({ queryKey: chatKeys.messages(activeSessionId) });
+    if (sessionId) {
+      // Clear pending immediately so the UI reflects "stopped" state.
+      // Do NOT invalidate messages here — the task may have already
+      // completed (race: agent finished before the cancel propagated
+      // to the daemon), and a premature refetch would render an orphan
+      // assistant message that the WS `chat:done` event hasn't cleared
+      // yet, creating the "stopping made it appear" illusion.
+      // Instead, let the `task:cancelled` WS event or the pending-task
+      // refetch populate the correct state.
+      qc.setQueryData(chatKeys.pendingTask(sessionId), {});
     }
   }, [pendingTaskId, activeSessionId, qc]);
 
