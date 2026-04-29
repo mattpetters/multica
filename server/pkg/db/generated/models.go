@@ -161,6 +161,8 @@ type ChatMessage struct {
 	Content       string             `json:"content"`
 	TaskID        pgtype.UUID        `json:"task_id"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	FailureReason pgtype.Text        `json:"failure_reason"`
+	ElapsedMs     pgtype.Int8        `json:"elapsed_ms"`
 }
 
 type ChatSession struct {

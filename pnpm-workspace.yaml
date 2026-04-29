@@ -32,6 +32,9 @@ catalog:
   # Icons
   lucide-react: "^1.0.1"
 
+  # Loading animations (chat StatusPill)
+  unicode-animations: "^1.0.3"
+
   # Product analytics
   posthog-js: "^1.176.1"
 

@@ -196,6 +196,22 @@ export interface TaskMessagePayload {
   output?: string;
 }
 
+export interface TaskQueuedPayload {
+  task_id: string;
+  agent_id: string;
+  issue_id: string;
+  chat_session_id?: string;
+  status: string;
+}
+
+export interface TaskDispatchPayload {
+  task_id: string;
+  agent_id: string;
+  issue_id: string;
+  runtime_id: string;
+  chat_session_id?: string;
+}
+
 export interface TaskCompletedPayload {
   task_id: string;
   agent_id: string;

@@ -94,6 +94,10 @@ interface ContentEditorRef {
   getMarkdown: () => string;
   clearContent: () => void;
   focus: () => void;
+  /** Drop focus from the editor — used by chat after send so the caret
+   *  stops competing with the StatusPill / streaming reply for the user's
+   *  attention. */
+  blur: () => void;
   uploadFile: (file: File) => void;
   /** True when file uploads are still in progress. */
   hasActiveUploads: () => boolean;
@@ -232,6 +236,9 @@ const ContentEditor = forwardRef<ContentEditorRef, ContentEditorProps>(
       },
       focus: () => {
         editor?.commands.focus();
+      },
+      blur: () => {
+        editor?.commands.blur();
       },
       uploadFile: (file: File) => {
         if (!editor || !onUploadFileRef.current) return;

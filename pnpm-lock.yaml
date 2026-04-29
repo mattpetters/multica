@@ -69,6 +69,9 @@ catalogs:
     typescript:
       specifier: ^5.9.3
       version: 5.9.3
+    unicode-animations:
+      specifier: ^1.0.3
+      version: 1.0.3
     vitest:
       specifier: ^4.1.0
       version: 4.1.0
@@ -609,6 +612,9 @@ importers:
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
+      unicode-animations:
+        specifier: 'catalog:'
+        version: 1.0.3
       vaul:
         specifier: ^1.1.2
         version: 1.1.2(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -7096,6 +7102,10 @@ packages:
   undici@7.24.5:
     resolution: {integrity: sha512-3IWdCpjgxp15CbJnsi/Y9TCDE7HWVN19j1hmzVhoAkY/+CJx449tVxT5wZc1Gwg8J+P0LWvzlBzxYRnHJ+1i7Q==}
     engines: {node: '>=20.18.1'}
+
+  unicode-animations@1.0.3:
+    resolution: {integrity: sha512-+klB2oWwcYZjYWhwP4Pr8UZffWDFVx6jKeIahE6z0QYyM2dwDeDPyn5nevCYbyotxvtT9lh21cVURO1RX0+YMg==}
+    hasBin: true
 
   unicorn-magic@0.3.0:
     resolution: {integrity: sha512-+QBBXBCvifc56fsbuxZQ6Sic3wqqc3WWaqxs58gvJrcOuN83HGTCwz3oS5phzU9LthRNE9VrJCFCLUgHeeFnfA==}
@@ -14813,6 +14823,8 @@ snapshots:
   undici-types@7.18.2: {}
 
   undici@7.24.5: {}
+
+  unicode-animations@1.0.3: {}
 
   unicorn-magic@0.3.0: {}
 
