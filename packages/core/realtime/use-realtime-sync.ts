@@ -32,7 +32,6 @@ import { onInboxNew, onInboxInvalidate, onInboxIssueStatusChanged, onInboxIssueD
 import { inboxKeys } from "../inbox/queries";
 import { workspaceKeys, workspaceListOptions } from "../workspace/queries";
 import { chatKeys } from "../chat/queries";
-import { useChatStore } from "../chat";
 import { resolvePostAuthDestination, useHasOnboarded } from "../paths";
 import type {
   MemberAddedPayload,
@@ -546,12 +545,11 @@ export function useRealtimeSync(
       invalidatePendingAggregate();
       // Assistant message just landed → has_unread may have flipped to true.
       invalidateSessionLists();
-      // Dequeue any queued messages — they will be sent by the chat page
-      // after the refetch confirms the task is no longer pending.
-      const queued = useChatStore.getState().dequeueMessages();
-      if (queued.length > 0) {
-        chatWsLogger.info("chat:done — dequeuing messages", { count: queued.length });
-      }
+      // NOTE: queued messages are flushed by the component-level
+      // pendingTaskId transition effect (chat-window / chat-page) which
+      // has access to handleSend.  Do NOT dequeue here — the WS handler
+      // runs before the React state settles, so popping the queue now
+      // would eat messages that the component effect never sees.
     });
 
     // Chat task lifecycle writethrough: keep `chatKeys.pendingTask(sessionId)`

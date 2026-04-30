@@ -14,9 +14,20 @@ interface SubmitButtonProps {
 function SubmitButton({ onClick, disabled, loading, running, onStop }: SubmitButtonProps) {
   if (running) {
     return (
-      <Button size="icon-sm" onClick={onStop}>
-        <Square className="fill-current" />
-      </Button>
+      <div className="flex items-center gap-1">
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          disabled={disabled}
+          onClick={onClick}
+          aria-label="Send (queued)"
+        >
+          <ArrowUp />
+        </Button>
+        <Button size="icon-sm" onClick={onStop} aria-label="Stop">
+          <Square className="fill-current" />
+        </Button>
+      </div>
     );
   }
 
