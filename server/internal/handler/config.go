@@ -20,6 +20,13 @@ type AppConfig struct {
 	// disable frontend event shipping too.
 	PosthogKey  string `json:"posthog_key"`
 	PosthogHost string `json:"posthog_host"`
+
+	// Deploy info — set via DEPLOYED_VERSION and DEPLOYED_COMMIT env vars
+	// (injected by CD pipeline into .env, passed by Docker Compose to container).
+	// Shows what commit is deployed and when.
+	Version string `json:"version,omitempty"`
+	Commit  string `json:"commit,omitempty"`
+	DeployedAt string `json:"deployed_at,omitempty"`
 }
 
 // GetConfig is mounted on the public (unauthenticated) route group because
@@ -44,6 +51,12 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 			config.PosthogHost = "https://us.i.posthog.com"
 		}
 	}
+
+	// Deploy info — exposed publicly so operators can check deployed version
+	// without SSH access. Set by CD pipeline via .env.
+	config.Version = os.Getenv("DEPLOYED_IMAGE_TAG")
+	config.Commit = os.Getenv("DEPLOYED_COMMIT_HASH")
+	config.DeployedAt = os.Getenv("DEPLOYED_AT")
 
 	writeJSON(w, http.StatusOK, config)
 }
