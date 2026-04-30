@@ -4,6 +4,7 @@ SELECT id, workspace_id, title, description, status, priority,
        parent_issue_id, position, due_date, created_at, updated_at, number, project_id
 FROM issue
 WHERE workspace_id = $1
+  AND archived_at IS NULL
   AND (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status'))
   AND (sqlc.narg('priority')::text IS NULL OR priority = sqlc.narg('priority'))
   AND (sqlc.narg('assignee_id')::uuid IS NULL OR assignee_id = sqlc.narg('assignee_id'))
@@ -77,6 +78,7 @@ SELECT id, workspace_id, title, description, status, priority,
        parent_issue_id, position, due_date, created_at, updated_at, number, project_id
 FROM issue
 WHERE workspace_id = $1
+  AND archived_at IS NULL
   AND status NOT IN ('done', 'cancelled')
   AND (sqlc.narg('priority')::text IS NULL OR priority = sqlc.narg('priority'))
   AND (sqlc.narg('assignee_id')::uuid IS NULL OR assignee_id = sqlc.narg('assignee_id'))
@@ -88,6 +90,7 @@ ORDER BY position ASC, created_at DESC;
 -- name: CountIssues :one
 SELECT count(*) FROM issue
 WHERE workspace_id = $1
+  AND archived_at IS NULL
   AND (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status'))
   AND (sqlc.narg('priority')::text IS NULL OR priority = sqlc.narg('priority'))
   AND (sqlc.narg('assignee_id')::uuid IS NULL OR assignee_id = sqlc.narg('assignee_id'))
@@ -133,6 +136,7 @@ SELECT parent_issue_id,
 FROM issue
 WHERE workspace_id = $1
   AND parent_issue_id IS NOT NULL
+  AND archived_at IS NULL
 GROUP BY parent_issue_id;
 
 -- SearchIssues: moved to handler (dynamic SQL for multi-word search support).
@@ -146,3 +150,31 @@ UPDATE issue
 SET first_executed_at = now()
 WHERE id = $1 AND first_executed_at IS NULL
 RETURNING id, workspace_id, creator_type, creator_id, first_executed_at;
+
+-- name: ArchiveIssue :one
+-- Guard with archived_at IS NULL to prevent concurrent archive requests
+-- from overwriting each other. Returns no rows if already archived.
+UPDATE issue SET archived_at = now(), archived_by = $2, updated_at = now()
+WHERE id = $1 AND archived_at IS NULL
+RETURNING *;
+
+-- name: RestoreIssue :one
+-- Guard with archived_at IS NOT NULL to prevent concurrent restore requests
+-- from conflicting. Returns no rows if not currently archived.
+UPDATE issue SET archived_at = NULL, archived_by = NULL, updated_at = now()
+WHERE id = $1 AND archived_at IS NOT NULL
+RETURNING *;
+
+-- name: ListArchivedIssues :many
+SELECT id, workspace_id, title, description, status, priority,
+       assignee_type, assignee_id, creator_type, creator_id,
+       parent_issue_id, position, due_date, created_at, updated_at, number, project_id,
+       archived_at, archived_by
+FROM issue
+WHERE workspace_id = $1 AND archived_at IS NOT NULL
+  AND (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status'))
+  AND (sqlc.narg('priority')::text IS NULL OR priority = sqlc.narg('priority'))
+  AND (sqlc.narg('assignee_id')::uuid IS NULL OR assignee_id = sqlc.narg('assignee_id'))
+  AND (sqlc.narg('project_id')::uuid IS NULL OR project_id = sqlc.narg('project_id'))
+ORDER BY archived_at DESC
+LIMIT $2 OFFSET $3;

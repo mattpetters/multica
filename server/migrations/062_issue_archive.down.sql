@@ -1,0 +1,2 @@
+ALTER TABLE issue DROP COLUMN IF EXISTS archived_by;
+ALTER TABLE issue DROP COLUMN IF EXISTS archived_at;
