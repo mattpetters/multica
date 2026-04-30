@@ -175,6 +175,13 @@ export function ChatWindow() {
         return;
       }
 
+      // If a task is running, queue the message instead of sending immediately.
+      if (pendingTaskId) {
+        apiLogger.info("sendChatMessage queued (task running)", { taskId: pendingTaskId });
+        useChatStore.getState().queueMessage(content);
+        return;
+      }
+
       const focusOn = useChatStore.getState().focusMode;
       const finalContent = focusOn && anchorCandidate
         ? `${buildAnchorMarkdown(anchorCandidate)}\n\n${content}`
@@ -253,6 +260,7 @@ export function ChatWindow() {
       createSession,
       setActiveSession,
       qc,
+      pendingTaskId,
     ],
   );
 
@@ -333,6 +341,28 @@ export function ChatWindow() {
     });
     setOpen(false);
   }, [activeSessionId, pendingTaskId, setOpen]);
+
+  // Dequeue messages when a task finishes (pendingTaskId clears).
+  // The queueMessage path in handleSend pushes content here when the
+  // user types while a task is running. Once the task completes (WS
+  // chat:done or pending-task refetch returns empty), send queued
+  // messages sequentially.
+  const prevTaskIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevTaskIdRef.current && !pendingTaskId) {
+      const queued = useChatStore.getState().dequeueMessages();
+      if (queued.length > 0) {
+        apiLogger.info("dequeue: sending queued messages", { count: queued.length });
+        void (async () => {
+          for (const content of queued) {
+            await handleSend(content);
+          }
+        })();
+      }
+    }
+    prevTaskIdRef.current = pendingTaskId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- we only care about pendingTaskId transitions
+  }, [pendingTaskId]);
 
   const windowRef = useRef<HTMLDivElement>(null);
   const { renderWidth, renderHeight, isAtMax, boundsReady, isDragging, toggleExpand, startDrag } = useChatResize(windowRef);

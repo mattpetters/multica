@@ -109,6 +109,8 @@ export interface ChatState {
   setShowHistory: (show: boolean) => void;
   queueMessage: (content: string) => void;
   dequeueMessages: () => string[];
+  removeQueuedMessage: (index: number) => void;
+  clearQueue: () => void;
   /** sessionId accepts a real session UUID or DRAFT_NEW_SESSION. */
   setInputDraft: (sessionId: string, draft: string) => void;
   clearInputDraft: (sessionId: string) => void;
@@ -185,6 +187,15 @@ export function createChatStore(options: ChatStoreOptions) {
       set({ queuedMessages: [] });
       return msgs;
 
+    },
+    removeQueuedMessage: (index: number) => {
+      const next = get().queuedMessages.filter((_, i) => i !== index);
+      logger.info("removeQueuedMessage", { index, remaining: next.length });
+      set({ queuedMessages: next });
+    },
+    clearQueue: () => {
+      logger.info("clearQueue", { dropped: get().queuedMessages.length });
+      set({ queuedMessages: [] });
     },
     setInputDraft: (sessionId, draft) => {
       // Debug level — onUpdate fires on every keystroke.
