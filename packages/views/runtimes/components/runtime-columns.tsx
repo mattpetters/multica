@@ -60,12 +60,10 @@ export interface RuntimeRow {
   canDelete: boolean;
 }
 
-// Column widths in px. The Runtime column has `meta.grow: true` so
-// DataTable skips its inline width — fixed table-layout assigns it the
-// leftover space. Its `size: 240` still flows into table.getTotalSize()
-// to set the table's `min-width`, giving the runtime column a 240px
-// floor below which the container scrolls horizontally instead of
-// shrinking the column further.
+// Column widths in px. Runtime, Health, and CLI grow together until the
+// user resizes them. Their `size` values still flow into table.getTotalSize()
+// to set the table's min-width, giving each grow column a real floor below
+// which the container scrolls horizontally instead of shrinking further.
 const COL_WIDTHS = {
   runtime: 240,
   health: 200,
@@ -105,6 +103,7 @@ export function createRuntimeColumns({
       id: "health",
       header: "Health",
       size: COL_WIDTHS.health,
+      meta: { grow: true },
       cell: ({ row }) => (
         <HealthCell runtime={row.original.runtime} now={now} />
       ),
@@ -118,11 +117,16 @@ export function createRuntimeColumns({
       size: COL_WIDTHS.owner,
       cell: ({ row }) =>
         row.original.ownerMember ? (
-          <ActorAvatar
-            actorType="member"
-            actorId={row.original.ownerMember.user_id}
-            size={18}
-          />
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <ActorAvatar
+              actorType="member"
+              actorId={row.original.ownerMember.user_id}
+              size={18}
+            />
+            <span className="truncate text-xs text-muted-foreground">
+              {row.original.ownerMember.name}
+            </span>
+          </span>
         ) : (
           <span className="text-xs text-muted-foreground/50">—</span>
         ),
@@ -164,6 +168,7 @@ export function createRuntimeColumns({
       id: "cli",
       header: "CLI",
       size: COL_WIDTHS.cli,
+      meta: { grow: true },
       cell: ({ row }) => (
         <CliCell
           runtime={row.original.runtime}
@@ -175,6 +180,7 @@ export function createRuntimeColumns({
       id: "actions",
       header: () => null,
       size: COL_WIDTHS.actions,
+      enableResizing: false,
       cell: ({ row }) => (
         <div
           className="flex justify-end"
@@ -510,6 +516,7 @@ function RowMenu({
           <DropdownMenuItem
             variant="destructive"
             onClick={() => setDeleteOpen(true)}
+            title="Only the runtime owner and workspace admins can delete this runtime"
           >
             <Trash2 className="h-3.5 w-3.5" />
             Delete
@@ -529,6 +536,9 @@ function RowMenu({
             <AlertDialogDescription>
               Are you sure you want to delete &ldquo;{runtime.name}&rdquo;?
               This action cannot be undone.
+              <span className="mt-2 block text-xs text-muted-foreground/80">
+                Only the runtime owner and workspace admins can delete a runtime.
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

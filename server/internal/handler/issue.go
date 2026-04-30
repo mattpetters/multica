@@ -13,10 +13,13 @@ import (
 	"time"
 	"unicode"
 
+	"errors"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/multica-ai/multica/server/internal/logger"
 	"github.com/multica-ai/multica/server/internal/util"
+	"github.com/multica-ai/multica/server/pkg/agent"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
@@ -929,6 +932,17 @@ func (h *Handler) QuickCreateIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Daemon CLI version gate. The agent-side prompt + create-flow rely on
+	// behaviors introduced in MinQuickCreateCLIVersion (URL attachment
+	// handling, no-retry on partial failure). Older daemons either
+	// double-create issues on partial CLI failures or mishandle pasted
+	// screenshot URLs; fail closed before enqueuing rather than surface
+	// the breakage as an inbox failure twenty seconds later.
+	if status, payload := h.checkQuickCreateDaemonVersion(r.Context(), agent.RuntimeID); status != 0 {
+		writeJSON(w, status, payload)
+		return
+	}
+
 	task, err := h.TaskService.EnqueueQuickCreateTask(r.Context(), wsUUID, requesterUUID, agentUUID, prompt)
 	if err != nil {
 		slog.Warn("quick-create enqueue failed", append(logger.RequestAttrs(r), "error", err)...)
@@ -960,6 +974,71 @@ func (h *Handler) isRuntimeOnline(ctx context.Context, runtimeID pgtype.UUID) bo
 		return false
 	}
 	return rt.Status == "online"
+}
+
+// checkQuickCreateDaemonVersion enforces MinQuickCreateCLIVersion against the
+// CLI version the daemon reported at registration time (stored on the runtime
+// row's metadata.cli_version). Returns (0, nil) when the version is
+// acceptable, otherwise (status, payload) ready to hand to writeJSON.
+//
+// Failure shape is stable so the modal can branch on the `code` field and
+// surface a "needs upgrade" hint that points at the specific runtime:
+//
+//	422 {
+//	  "code": "daemon_version_unsupported",
+//	  "current_version": "0.2.18" | "",
+//	  "min_version":     "0.2.20",
+//	  "runtime_id":      "<uuid>"
+//	}
+func (h *Handler) checkQuickCreateDaemonVersion(ctx context.Context, runtimeID pgtype.UUID) (int, map[string]any) {
+	rt, err := h.Queries.GetAgentRuntime(ctx, runtimeID)
+	if err != nil {
+		// Runtime row vanished between the online check and here — treat
+		// as unavailable rather than wedging the request on a 500.
+		return http.StatusUnprocessableEntity, map[string]any{
+			"code":   "agent_unavailable",
+			"reason": "agent's runtime is no longer registered",
+		}
+	}
+	current := readRuntimeCLIVersion(rt.Metadata)
+	switch err := agent.CheckMinCLIVersion(current); {
+	case err == nil:
+		return 0, nil
+	case errors.Is(err, agent.ErrCLIVersionMissing), errors.Is(err, agent.ErrCLIVersionTooOld):
+		return http.StatusUnprocessableEntity, map[string]any{
+			"code":            "daemon_version_unsupported",
+			"current_version": current,
+			"min_version":     agent.MinQuickCreateCLIVersion,
+			"runtime_id":      uuidToString(runtimeID),
+		}
+	default:
+		// Defensive fall-through: unknown error from the version check is
+		// also fail-closed, since the gate exists precisely because we
+		// can't trust older daemons with this flow.
+		return http.StatusUnprocessableEntity, map[string]any{
+			"code":            "daemon_version_unsupported",
+			"current_version": current,
+			"min_version":     agent.MinQuickCreateCLIVersion,
+			"runtime_id":      uuidToString(runtimeID),
+		}
+	}
+}
+
+// readRuntimeCLIVersion pulls metadata.cli_version off a runtime row. The
+// metadata column is JSONB on the wire; the daemon stores the multica CLI
+// version under that key during registration (see DaemonRegister).
+func readRuntimeCLIVersion(metadata []byte) string {
+	if len(metadata) == 0 {
+		return ""
+	}
+	var m map[string]any
+	if err := json.Unmarshal(metadata, &m); err != nil {
+		return ""
+	}
+	if v, ok := m["cli_version"].(string); ok {
+		return v
+	}
+	return ""
 }
 
 type CreateIssueRequest struct {
@@ -1612,6 +1691,32 @@ func (h *Handler) BatchUpdateIssues(w http.ResponseWriter, r *http.Request) {
 	var rawUpdates map[string]json.RawMessage
 	if raw, exists := rawTop["updates"]; exists {
 		json.Unmarshal(raw, &rawUpdates)
+	}
+
+	// Short-circuit when no mutation field is present in `updates`. Without
+	// this, the loop below runs N no-op UPDATEs (every if-guard skips, every
+	// COALESCE preserves the existing value) and reports `{"updated": N}` —
+	// the response cheerfully claims success while nothing changed. Most
+	// real-world cases that hit this path are caller mistakes (status placed
+	// at the top level, "update" misspelled as singular). Telling the truth
+	// here — `{"updated": 0}` — keeps the wire shape stable while making the
+	// count match reality. See multica-ai/multica#1660.
+	hasMutation := req.Updates.Title != nil ||
+		req.Updates.Description != nil ||
+		req.Updates.Status != nil ||
+		req.Updates.Priority != nil ||
+		req.Updates.Position != nil
+	if !hasMutation {
+		for _, k := range []string{"assignee_type", "assignee_id", "due_date", "parent_issue_id", "project_id"} {
+			if _, ok := rawUpdates[k]; ok {
+				hasMutation = true
+				break
+			}
+		}
+	}
+	if !hasMutation {
+		writeJSON(w, http.StatusOK, map[string]any{"updated": 0})
+		return
 	}
 
 	workspaceID := h.resolveWorkspaceID(r)

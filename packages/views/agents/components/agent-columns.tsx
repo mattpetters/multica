@@ -7,6 +7,7 @@ import {
   type AgentActivity,
   type AgentPresenceDetail,
   summarizeActivityWindow,
+  VISIBILITY_TOOLTIP,
 } from "@multica/core/agents";
 import {
   Tooltip,
@@ -30,6 +31,8 @@ export interface AgentRow {
   // Inline owner avatar — non-null when the page wants to attribute the
   // agent to a teammate (typically All scope on someone else's agent).
   ownerIdToShow: string | null;
+  // True when the current user owns this agent (drives the "You" badge).
+  isOwnedByMe: boolean;
   // True when the current user can archive / cancel-tasks on this agent.
   canManage: boolean;
 }
@@ -38,18 +41,17 @@ export interface AgentRow {
 // column.size doubles as the cell's effective max-width: truncatable
 // cells with `truncate` inside hit ellipsis at the column edge.
 //
-// The Agent column has `meta.grow: true` so DataTable skips its inline
-// `width` — that lets fixed table-layout assign it the leftover space
-// (= container width − sum of other columns), so the table fills the
-// viewport without an empty spacer column.
+// The Agent and Runtime columns have `meta.grow: true` so DataTable skips
+// their inline widths until the user resizes them. Fixed table-layout splits
+// the leftover space between them, which keeps Agent from monopolising wide
+// viewports while still giving both columns a real floor.
 //
-// The Agent column also keeps `size: 240` even though it isn't used for
-// rendering. TanStack folds this into `table.getTotalSize()`, which
-// DataTable applies as the table's `min-width`. That's how the agent
-// column gets a real 240px floor: when the viewport drops below
-// `sum + 240`, the table refuses to shrink further and the container
-// scrolls instead. (Fixed table-layout ignores cell-level min-width
-// per spec, so the floor has to live on the table itself.)
+// The grow columns also keep their `size` values even though those widths
+// are skipped for initial rendering. TanStack folds them into
+// `table.getTotalSize()`, which DataTable applies as the table's `min-width`.
+// That's how the grow columns get real floors: when the viewport drops below
+// the summed column sizes, the table refuses to shrink further and the
+// container scrolls instead.
 const COL_WIDTHS = {
   agent: 240,
   status: 120,
@@ -102,6 +104,7 @@ export function createAgentColumns({
       id: "runtime",
       header: "Runtime",
       size: COL_WIDTHS.runtime,
+      meta: { grow: true },
       cell: ({ row }) => <RuntimeCell row={row.original} />,
     },
     {
@@ -126,6 +129,7 @@ export function createAgentColumns({
       id: "actions",
       header: () => null,
       size: COL_WIDTHS.actions,
+      enableResizing: false,
       cell: ({ row }) => (
         <div
           className="flex justify-end"
@@ -150,7 +154,7 @@ export function createAgentColumns({
 // ---------------------------------------------------------------------------
 
 function AgentNameCell({ row }: { row: AgentRow }) {
-  const { agent, ownerIdToShow } = row;
+  const { agent, ownerIdToShow, isOwnedByMe } = row;
   const isArchived = !!agent.archived_at;
   const isPrivate = agent.visibility === "private";
 
@@ -180,9 +184,14 @@ function AgentNameCell({ row }: { row: AgentRow }) {
                 }
               />
               <TooltipContent>
-                Private — only the owner can assign work
+                {VISIBILITY_TOOLTIP.private}
               </TooltipContent>
             </Tooltip>
+          )}
+          {isOwnedByMe && !ownerIdToShow && (
+            <span className="shrink-0 rounded bg-muted px-1 text-[10px] font-medium text-muted-foreground">
+              You
+            </span>
           )}
           {ownerIdToShow && (
             <ActorAvatar

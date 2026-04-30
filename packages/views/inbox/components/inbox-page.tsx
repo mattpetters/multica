@@ -21,6 +21,7 @@ import {
   useArchiveAllReadInbox,
   useArchiveCompletedInbox,
 } from "@multica/core/inbox/mutations";
+import { useUpdateIssue } from "@multica/core/issues/mutations";
 import { IssueDetail } from "../../issues/components";
 import { useNavigation } from "../../navigation";
 import { toast } from "sonner";
@@ -53,6 +54,7 @@ import { useIsMobile } from "@multica/ui/hooks/use-mobile";
 import { PageHeader } from "../../layout/page-header";
 import { InboxListItem, timeAgo } from "./inbox-list-item";
 import { typeLabels } from "./inbox-detail-label";
+import { getInboxDisplayTitle } from "./inbox-display";
 
 export function InboxPage() {
   const { searchParams, replace } = useNavigation();
@@ -119,6 +121,7 @@ export function InboxPage() {
   const archiveAllMutation = useArchiveAllInbox();
   const archiveAllReadMutation = useArchiveAllReadInbox();
   const archiveCompletedMutation = useArchiveCompletedInbox();
+  const updateIssueMutation = useUpdateIssue();
 
   // Auto-mark-read whenever a selected item is unread — covers both click-
   // to-select and URL-param-select (e.g. OS notification click on desktop).
@@ -150,6 +153,18 @@ export function InboxPage() {
   const handleMarkUnread = (id: string) => {
     markUnreadMutation.mutate(id, {
       onError: () => toast.error("Failed to mark as unread"),
+    });
+  };
+
+  const handleDone = (item: InboxItem) => {
+    if (!item.issue_id) return;
+    setSelectedKey("");
+    updateIssueMutation.mutate(
+      { id: item.issue_id, status: "done" },
+      { onError: () => toast.error("Failed to mark as done") },
+    );
+    archiveMutation.mutate(item.id, {
+      onError: () => toast.error("Failed to archive"),
     });
   };
 
@@ -244,6 +259,11 @@ export function InboxPage() {
           onClick={() => handleSelect(item)}
           onArchive={() => handleArchive(item.id)}
           onMarkUnread={() => handleMarkUnread(item.id)}
+          onDone={
+            item.issue_id && item.issue_status !== "done" && item.issue_status !== "cancelled"
+              ? () => handleDone(item)
+              : undefined
+          }
         />
       ))}
     </div>
@@ -267,10 +287,16 @@ export function InboxPage() {
         // longer exists.
         setSelectedKey("");
       }}
+      onDone={() => {
+        setSelectedKey("");
+        archiveMutation.mutate(selected.id, {
+          onError: () => toast.error("Failed to archive"),
+        });
+      }}
     />
   ) : selected ? (
     <div className="p-6">
-      <h2 className="text-lg font-semibold">{selected.title}</h2>
+      <h2 className="text-lg font-semibold">{getInboxDisplayTitle(selected)}</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         {typeLabels[selected.type]} · {timeAgo(selected.created_at)}
       </p>

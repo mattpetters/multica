@@ -2,7 +2,7 @@
 
 import { StatusIcon } from "../../issues/components";
 import { ActorAvatar } from "../../common/actor-avatar";
-import { Archive, Mail } from "lucide-react";
+import { Archive, CircleCheck, Mail } from "lucide-react";
 import type { InboxItem } from "@multica/core/types";
 import { InboxDetailLabel } from "./inbox-detail-label";
 
@@ -25,12 +25,14 @@ export function InboxListItem({
   onClick,
   onArchive,
   onMarkUnread,
+  onDone,
 }: {
   item: InboxItem;
   isSelected: boolean;
   onClick: () => void;
   onArchive: () => void;
   onMarkUnread: () => void;
+  onDone?: () => void;
 }) {
   return (
     <button
