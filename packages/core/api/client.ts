@@ -477,6 +477,14 @@ export class ApiClient {
     });
   }
 
+  async archiveIssue(id: string): Promise<Issue> {
+    return this.fetch(`/api/issues/${id}/archive`, { method: "POST" });
+  }
+
+  async restoreIssue(id: string): Promise<Issue> {
+    return this.fetch(`/api/issues/${id}/restore`, { method: "POST" });
+  }
+
   // Comments
   async listComments(issueId: string): Promise<Comment[]> {
     return this.fetch(`/api/issues/${issueId}/comments`);

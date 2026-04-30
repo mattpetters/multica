@@ -13,7 +13,7 @@ import { useAuthStore } from "@multica/core/auth";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { useWorkspacePaths } from "@multica/core/paths";
 import { useModalStore } from "@multica/core/modals";
-import { useUpdateIssue } from "@multica/core/issues/mutations";
+import { useUpdateIssue, useArchiveIssue, useRestoreIssue } from "@multica/core/issues/mutations";
 import {
   memberListOptions,
   agentListOptions,
@@ -37,6 +37,8 @@ export interface UseIssueActionsResult {
   openSetParent: () => void;
   openAddChild: () => void;
   openDeleteConfirm: (opts?: { onDeletedNavigateTo?: string }) => void;
+  archiveIssue: () => void;
+  restoreIssue: () => void;
 }
 
 /**
@@ -76,6 +78,8 @@ export function useIssueActions(issue: Issue | null): UseIssueActionsResult {
     );
 
   const updateIssue = useUpdateIssue();
+  const archiveIssueMut = useArchiveIssue();
+  const restoreIssueMut = useRestoreIssue();
   const createPin = useCreatePin();
   const deletePin = useDeletePin();
   const openModal = useModalStore((s) => s.open);
@@ -161,6 +165,22 @@ export function useIssueActions(issue: Issue | null): UseIssueActionsResult {
     [openModal, issueId, issueIdentifier],
   );
 
+  const handleArchiveIssue = useCallback(() => {
+    if (!issueId) return;
+    archiveIssueMut.mutate(issueId, {
+      onSuccess: () => toast.success("Issue archived"),
+      onError: () => toast.error("Failed to archive issue"),
+    });
+  }, [issueId, archiveIssueMut]);
+
+  const handleRestoreIssue = useCallback(() => {
+    if (!issueId) return;
+    restoreIssueMut.mutate(issueId, {
+      onSuccess: () => toast.success("Issue restored"),
+      onError: () => toast.error("Failed to restore issue"),
+    });
+  }, [issueId, restoreIssueMut]);
+
   return {
     members,
     agents: filteredAgents,
@@ -172,5 +192,7 @@ export function useIssueActions(issue: Issue | null): UseIssueActionsResult {
     openSetParent,
     openAddChild,
     openDeleteConfirm,
+    archiveIssue: handleArchiveIssue,
+    restoreIssue: handleRestoreIssue,
   };
 }
