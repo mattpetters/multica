@@ -115,3 +115,43 @@ export function onIssueDeleted(
     qc.invalidateQueries({ queryKey: issueKeys.childProgress(wsId) });
   }
 }
+
+/**
+ * Handle `issue:archived` WS event — remove the issue from the active list
+ * cache (archived issues are not shown in the default view).
+ */
+export function onIssueArchived(
+  qc: QueryClient,
+  wsId: string,
+  issue: Issue,
+) {
+  qc.setQueryData<ListIssuesCache>(issueKeys.list(wsId), (old) =>
+    old ? removeIssueFromBuckets(old, issue.id) : old,
+  );
+  qc.invalidateQueries({ queryKey: issueKeys.myAll(wsId) });
+  qc.removeQueries({ queryKey: issueKeys.detail(wsId, issue.id) });
+  if (issue.parent_issue_id) {
+    qc.invalidateQueries({ queryKey: issueKeys.children(wsId, issue.parent_issue_id) });
+    qc.invalidateQueries({ queryKey: issueKeys.childProgress(wsId) });
+  }
+}
+
+/**
+ * Handle `issue:restored` WS event — add the issue back to the active list
+ * cache so it reappears in the board/list views.
+ */
+export function onIssueRestored(
+  qc: QueryClient,
+  wsId: string,
+  issue: Issue,
+) {
+  qc.setQueryData<ListIssuesCache>(issueKeys.list(wsId), (old) =>
+    old ? addIssueToBuckets(old, issue) : old,
+  );
+  qc.invalidateQueries({ queryKey: issueKeys.myAll(wsId) });
+  qc.setQueryData<Issue>(issueKeys.detail(wsId, issue.id), issue);
+  if (issue.parent_issue_id) {
+    qc.invalidateQueries({ queryKey: issueKeys.children(wsId, issue.parent_issue_id) });
+    qc.invalidateQueries({ queryKey: issueKeys.childProgress(wsId) });
+  }
+}

@@ -3,6 +3,8 @@
 import {
   ArrowDown,
   ArrowUp,
+  Archive,
+  ArchiveRestore,
   Calendar,
   Link2,
   MoreHorizontal,
@@ -93,6 +95,8 @@ export function IssueActionsMenuItems({
     openSetParent,
     openAddChild,
     openDeleteConfirm,
+    archiveIssue,
+    restoreIssue,
   } = actions;
 
   const now = () => new Date();
@@ -264,6 +268,22 @@ export function IssueActionsMenuItems({
       </P.Sub>
 
       <P.Separator />
+
+      {/* Archive — only for done/cancelled issues that aren't already archived */}
+      {(issue.status === "done" || issue.status === "cancelled") && !issue.archived_at && (
+        <P.Item onClick={archiveIssue}>
+          <Archive className="h-3.5 w-3.5" />
+          Archive issue
+        </P.Item>
+      )}
+
+      {/* Restore — only for archived issues */}
+      {issue.archived_at && (
+        <P.Item onClick={restoreIssue}>
+          <ArchiveRestore className="h-3.5 w-3.5" />
+          Restore issue
+        </P.Item>
+      )}
 
       <P.Item
         variant="destructive"

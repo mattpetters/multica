@@ -517,3 +517,55 @@ export function useToggleIssueSubscriber(issueId: string) {
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// Issue Archive / Restore
+// ---------------------------------------------------------------------------
+
+export function useArchiveIssue() {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceId();
+  return useMutation({
+    mutationFn: (id: string) => api.archiveIssue(id),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: issueKeys.list(wsId) });
+      const prevList = qc.getQueryData<ListIssuesCache>(issueKeys.list(wsId));
+      const archived = prevList ? findIssueLocation(prevList, id)?.issue : undefined;
+      qc.setQueryData<ListIssuesCache>(issueKeys.list(wsId), (old) =>
+        old ? removeIssueFromBuckets(old, id) : old,
+      );
+      qc.removeQueries({ queryKey: issueKeys.detail(wsId, id) });
+      return { prevList, parentIssueId: archived?.parent_issue_id };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prevList) qc.setQueryData(issueKeys.list(wsId), ctx.prevList);
+    },
+    onSettled: (_data, _err, _id, ctx) => {
+      qc.invalidateQueries({ queryKey: issueKeys.list(wsId) });
+      if (ctx?.parentIssueId) {
+        qc.invalidateQueries({ queryKey: issueKeys.children(wsId, ctx.parentIssueId) });
+        qc.invalidateQueries({ queryKey: issueKeys.childProgress(wsId) });
+      }
+    },
+  });
+}
+
+export function useRestoreIssue() {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceId();
+  return useMutation({
+    mutationFn: (id: string) => api.restoreIssue(id),
+    onSuccess: (restoredIssue) => {
+      qc.setQueryData<ListIssuesCache>(issueKeys.list(wsId), (old) =>
+        old ? addIssueToBuckets(old, restoredIssue) : old,
+      );
+      if (restoredIssue.parent_issue_id) {
+        qc.invalidateQueries({ queryKey: issueKeys.children(wsId, restoredIssue.parent_issue_id) });
+        qc.invalidateQueries({ queryKey: issueKeys.childProgress(wsId) });
+      }
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: issueKeys.list(wsId) });
+    },
+  });
+}

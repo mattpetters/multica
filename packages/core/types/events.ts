@@ -12,6 +12,8 @@ export type WSEventType =
   | "issue:created"
   | "issue:updated"
   | "issue:deleted"
+  | "issue:archived"
+  | "issue:restored"
   | "comment:created"
   | "comment:updated"
   | "comment:deleted"
@@ -82,6 +84,14 @@ export interface IssueUpdatedPayload {
 
 export interface IssueDeletedPayload {
   issue_id: string;
+}
+
+export interface IssueArchivedPayload {
+  issue: Issue;
+}
+
+export interface IssueRestoredPayload {
+  issue: Issue;
 }
 
 export interface IssueLabelsChangedPayload {

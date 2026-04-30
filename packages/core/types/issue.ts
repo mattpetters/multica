@@ -39,6 +39,7 @@ export interface Issue {
   project_id: string | null;
   position: number;
   due_date: string | null;
+  archived_at: string | null;
   reactions?: IssueReaction[];
   labels?: Label[];
   created_at: string;

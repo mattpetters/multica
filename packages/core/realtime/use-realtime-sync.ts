@@ -25,6 +25,8 @@ import {
   onIssueUpdated,
   onIssueDeleted,
   onIssueLabelsChanged,
+  onIssueArchived,
+  onIssueRestored,
 } from "../issues/ws-updaters";
 import { onInboxNew, onInboxInvalidate, onInboxIssueStatusChanged, onInboxIssueDeleted } from "../inbox/ws-updaters";
 import { inboxKeys } from "../inbox/queries";
@@ -40,6 +42,8 @@ import type {
   IssueCreatedPayload,
   IssueDeletedPayload,
   IssueLabelsChangedPayload,
+  IssueArchivedPayload,
+  IssueRestoredPayload,
   InboxNewPayload,
   CommentCreatedPayload,
   CommentUpdatedPayload,
@@ -199,7 +203,7 @@ export function useRealtimeSync(
 
     // Event types handled by specific handlers below -- skip generic refresh
     const specificEvents = new Set([
-      "issue:updated", "issue:created", "issue:deleted", "issue_labels:changed", "inbox:new",
+      "issue:updated", "issue:created", "issue:deleted", "issue:archived", "issue:restored", "issue_labels:changed", "inbox:new",
       "comment:created", "comment:updated", "comment:deleted",
       "activity:created",
       "reaction:added", "reaction:removed",
@@ -266,6 +270,20 @@ export function useRealtimeSync(
       if (!issue_id) return;
       const wsId = getCurrentWsId();
       if (wsId) onIssueLabelsChanged(qc, wsId, issue_id, labels ?? []);
+    });
+
+    const unsubIssueArchived = ws.on("issue:archived", (p) => {
+      const { issue } = p as IssueArchivedPayload;
+      if (!issue) return;
+      const wsId = getCurrentWsId();
+      if (wsId) onIssueArchived(qc, wsId, issue);
+    });
+
+    const unsubIssueRestored = ws.on("issue:restored", (p) => {
+      const { issue } = p as IssueRestoredPayload;
+      if (!issue) return;
+      const wsId = getCurrentWsId();
+      if (wsId) onIssueRestored(qc, wsId, issue);
     });
 
     const unsubInboxNew = ws.on("inbox:new", (p) => {
@@ -638,6 +656,8 @@ export function useRealtimeSync(
       unsubIssueCreated();
       unsubIssueDeleted();
       unsubIssueLabelsChanged();
+      unsubIssueArchived();
+      unsubIssueRestored();
       unsubInboxNew();
       unsubCommentCreated();
       unsubCommentUpdated();
