@@ -323,6 +323,8 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Get("/labels", h.ListLabelsForIssue)
 					r.Post("/labels", h.AttachLabel)
 					r.Delete("/labels/{labelId}", h.DetachLabel)
+					r.Post("/archive", h.ArchiveIssue)
+					r.Post("/restore", h.RestoreIssue)
 				})
 			})
 

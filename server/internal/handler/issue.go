@@ -41,6 +41,7 @@ type IssueResponse struct {
 	DueDate            *string                 `json:"due_date"`
 	CreatedAt          string                  `json:"created_at"`
 	UpdatedAt          string                  `json:"updated_at"`
+	ArchivedAt         *string                 `json:"archived_at,omitempty"`
 	Reactions          []IssueReactionResponse `json:"reactions,omitempty"`
 	Attachments        []AttachmentResponse    `json:"attachments,omitempty"`
 	// Labels are bulk-attached by list/detail endpoints so the client can render
@@ -73,6 +74,7 @@ func issueToResponse(i db.Issue, issuePrefix string) IssueResponse {
 		DueDate:       timestampToPtr(i.DueDate),
 		CreatedAt:     timestampToString(i.CreatedAt),
 		UpdatedAt:     timestampToString(i.UpdatedAt),
+		ArchivedAt:    timestampToPtr(i.ArchivedAt),
 	}
 }
 
@@ -1572,6 +1574,67 @@ func (h *Handler) DeleteIssue(w http.ResponseWriter, r *http.Request) {
 	h.publish(protocol.EventIssueDeleted, uuidToString(issue.WorkspaceID), actorType, actorID, map[string]any{"issue_id": resolvedID})
 	slog.Info("issue deleted", append(logger.RequestAttrs(r), "issue_id", resolvedID, "workspace_id", uuidToString(issue.WorkspaceID))...)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) ArchiveIssue(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	issue, ok := h.loadIssueForUser(w, r, id)
+	if !ok {
+		return
+	}
+	if issue.ArchivedAt.Valid {
+		writeError(w, http.StatusConflict, "issue is already archived")
+		return
+	}
+
+	userID := requestUserID(r)
+	archived, err := h.Queries.ArchiveIssue(r.Context(), db.ArchiveIssueParams{
+		ID:         issue.ID,
+		ArchivedBy: parseUUID(userID),
+	})
+	if err != nil {
+		slog.Warn("archive issue failed", append(logger.RequestAttrs(r), "error", err, "issue_id", id)...)
+		writeError(w, http.StatusInternalServerError, "failed to archive issue")
+		return
+	}
+
+	h.TaskService.CancelTasksForIssue(r.Context(), issue.ID)
+
+	wsID := uuidToString(archived.WorkspaceID)
+	prefix := h.getIssuePrefix(r.Context(), archived.WorkspaceID)
+	resp := issueToResponse(archived, prefix)
+	actorType, actorID := h.resolveActor(r, userID, wsID)
+	h.publish(protocol.EventIssueArchived, wsID, actorType, actorID, map[string]any{"issue": resp})
+	slog.Info("issue archived", append(logger.RequestAttrs(r), "issue_id", id, "workspace_id", wsID)...)
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) RestoreIssue(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	issue, ok := h.loadIssueForUser(w, r, id)
+	if !ok {
+		return
+	}
+	if !issue.ArchivedAt.Valid {
+		writeError(w, http.StatusConflict, "issue is not archived")
+		return
+	}
+
+	restored, err := h.Queries.RestoreIssue(r.Context(), issue.ID)
+	if err != nil {
+		slog.Warn("restore issue failed", append(logger.RequestAttrs(r), "error", err, "issue_id", id)...)
+		writeError(w, http.StatusInternalServerError, "failed to restore issue")
+		return
+	}
+
+	wsID := uuidToString(restored.WorkspaceID)
+	prefix := h.getIssuePrefix(r.Context(), restored.WorkspaceID)
+	resp := issueToResponse(restored, prefix)
+	userID := requestUserID(r)
+	actorType, actorID := h.resolveActor(r, userID, wsID)
+	h.publish(protocol.EventIssueRestored, wsID, actorType, actorID, map[string]any{"issue": resp})
+	slog.Info("issue restored", append(logger.RequestAttrs(r), "issue_id", id, "workspace_id", wsID)...)
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // ---------------------------------------------------------------------------
