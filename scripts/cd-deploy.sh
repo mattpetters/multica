@@ -1,11 +1,10 @@
 #!/bin/bash
 # cd-deploy.sh — VPS-side deploy script for the Multica CD pipeline
-# Called from GitHub Actions via SSH.
+# Runs directly on VPS via self-hosted GitHub Actions runner.
 #
-# Usage:
-#   ssh root@vps BACKEND_IMAGE=... WEB_IMAGE=... IMAGE_TAG=... \
-#     COMMIT_SHA=... [GHCR_PAT=...] \
-#     bash /docker/multica/scripts/cd-deploy.sh
+# Usage (called by deploy.yml — not typically run manually):
+#   BACKEND_IMAGE=... WEB_IMAGE=... IMAGE_TAG=... \
+#     COMMIT_SHA=... bash /docker/multica/scripts/cd-deploy.sh
 set -euo pipefail
 
 cd "${DEPLOY_DIR:-/docker/multica}"
@@ -28,13 +27,6 @@ echo "  Dir:     $(pwd)"
 echo "  Time:    $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 echo "========================================"
 
-# ── Login to GHCR if token provided ──────────────────────
-if [ -n "${GHCR_PAT:-}" ]; then
-  echo "🔄 Logging in to ghcr.io..."
-  echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin 2>/dev/null
-  echo "✅ GHCR authenticated"
-fi
-
 # ── Save previous tag ─────────────────────────────────────────
 PREV_IMAGE_TAG=""
 if [ -f .env ]; then
@@ -43,38 +35,37 @@ fi
 echo "$PREV_IMAGE_TAG" > /tmp/.cd-prev-tag
 echo "Previous tag: '${PREV_IMAGE_TAG:-none}'"
 
-# ── Pull images ───────────────────────────────────────────────
+# ── Pull images if not available locally ──────────────────────
+# Self-hosted runner builds locally, so images should already exist.
+# Pull is only needed for rollbacks to older tags.
 echo ""
-echo "=== Pulling images ==="
-docker pull "${BACKEND_IMAGE}:${IMAGE_TAG}" | tail -1
-docker pull "${WEB_IMAGE}:${IMAGE_TAG}" | tail -1
+echo "=== Checking images ==="
+for img in "${BACKEND_IMAGE}:${IMAGE_TAG}" "${WEB_IMAGE}:${IMAGE_TAG}"; do
+  if docker image inspect "$img" > /dev/null 2>&1; then
+    echo "✅ $img (local)"
+  else
+    echo "🔄 Pulling $img ..."
+    docker pull "$img" | tail -1
+  fi
+done
 
 # ── Write version info to .env ────────────────────────────────
 echo ""
 echo "=== Updating .env ==="
-if grep -q '^DEPLOYED_IMAGE_TAG=' .env 2>/dev/null; then
-  sed -i "s/^DEPLOYED_IMAGE_TAG=.*/DEPLOYED_IMAGE_TAG=${IMAGE_TAG}/" .env
-else
-  echo "DEPLOYED_IMAGE_TAG=${IMAGE_TAG}" >> .env
-fi
 
-if grep -q '^DEPLOYED_COMMIT_HASH=' .env 2>/dev/null; then
-  sed -i "s/^DEPLOYED_COMMIT_HASH=.*/DEPLOYED_COMMIT_HASH=${COMMIT_SHA}/" .env
-else
-  echo "DEPLOYED_COMMIT_HASH=${COMMIT_SHA}" >> .env
-fi
+update_env_var() {
+  local key="$1" val="$2"
+  if grep -q "^${key}=" .env 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${val}|" .env
+  else
+    echo "${key}=${val}" >> .env
+  fi
+}
 
-if grep -q '^DEPLOYED_COMMIT_MSG=' .env 2>/dev/null; then
-  sed -i "s|^DEPLOYED_COMMIT_MSG=.*|DEPLOYED_COMMIT_MSG=${COMMIT_MSG}|" .env
-else
-  echo "DEPLOYED_COMMIT_MSG=${COMMIT_MSG}" >> .env
-fi
-
-if grep -q '^DEPLOYED_AT=' .env 2>/dev/null; then
-  sed -i "s|^DEPLOYED_AT=.*|DEPLOYED_AT=$(date -u '+%Y-%m-%dT%H:%M:%SZ')|" .env
-else
-  echo "DEPLOYED_AT=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> .env
-fi
+update_env_var "DEPLOYED_IMAGE_TAG" "$IMAGE_TAG"
+update_env_var "DEPLOYED_COMMIT_HASH" "$COMMIT_SHA"
+update_env_var "DEPLOYED_COMMIT_MSG" "$COMMIT_MSG"
+update_env_var "DEPLOYED_AT" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
 echo ".env updated"
 
