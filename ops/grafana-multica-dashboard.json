@@ -1,0 +1,426 @@
+{
+  "title": "Multica Overview",
+  "description": "Monitoring dashboard for self-hosted Multica stack \u2014 agent health, HTTP throughput, DB pool, system metrics, and deploy tracking.",
+  "tags": [
+    "multica",
+    "self-hosted",
+    "monitoring"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "title": "Active Agent Connections",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "multica_daemonws_active_connections",
+          "legendFormat": "agents"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          }
+        }
+      }
+    },
+    {
+      "title": "HTTP Request Rate",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 4,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "rate(multica_http_requests_total[5m])",
+          "legendFormat": "{{method}} {{route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "title": "HTTP Error Rate (5xx)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "rate(multica_http_requests_total{status=~\"5..\"}[5m])",
+          "legendFormat": "5xx"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          }
+        }
+      }
+    },
+    {
+      "title": "Active HTTP Requests",
+      "type": "gauge",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 18,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "multica_http_in_flight_requests"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    {
+      "title": "DB Pool Usage",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 4
+      },
+      "targets": [
+        {
+          "expr": "multica_db_pool_acquired_conns",
+          "legendFormat": "acquired"
+        },
+        {
+          "expr": "multica_db_pool_idle_conns",
+          "legendFormat": "idle"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "title": "DB Acquire Wait Time",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 4
+      },
+      "targets": [
+        {
+          "expr": "rate(multica_db_pool_acquire_duration_seconds_total[5m])",
+          "legendFormat": "acquire wait"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "title": "CPU Usage",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 4
+      },
+      "targets": [
+        {
+          "expr": "100 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100",
+          "legendFormat": "CPU"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        }
+      }
+    },
+    {
+      "title": "Memory Usage",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 4
+      },
+      "targets": [
+        {
+          "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+          "legendFormat": "used"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "title": "Disk Usage",
+      "type": "gauge",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "100 - (node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} * 100)",
+          "legendFormat": "disk"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Go Goroutines",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 4,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "go_goroutines",
+          "legendFormat": "goroutines"
+        }
+      ]
+    },
+    {
+      "title": "Go Heap Allocations",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 10,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "go_memstats_heap_alloc_bytes",
+          "legendFormat": "heap alloc"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "title": "Go GC Duration",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 16,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "go_gc_duration_seconds_sum",
+          "legendFormat": "GC pause"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "title": "Realtime WS Connections",
+      "type": "stat",
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 0,
+        "y": 12
+      },
+      "targets": [
+        {
+          "expr": "multica_realtime_active_connections",
+          "legendFormat": "connections"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      }
+    },
+    {
+      "title": "Realtime Messages Sent",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 4,
+        "y": 12
+      },
+      "targets": [
+        {
+          "expr": "rate(multica_realtime_messages_sent_total[5m])",
+          "legendFormat": "msgs/s"
+        }
+      ]
+    },
+    {
+      "title": "Build / Deploy Info",
+      "type": "table",
+      "gridPos": {
+        "h": 3,
+        "w": 8,
+        "x": 10,
+        "y": 12
+      },
+      "targets": [
+        {
+          "expr": "multica_build_info",
+          "legendFormat": "",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left"
+          }
+        }
+      }
+    },
+    {
+      "title": "Daemon WS Wakeup Delivery",
+      "type": "stat",
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 18,
+        "y": 12
+      },
+      "targets": [
+        {
+          "expr": "multica_daemonws_wakeup_delivered_total{result=\"hit\"}",
+          "legendFormat": "hits"
+        },
+        {
+          "expr": "multica_daemonws_wakeup_delivered_total{result=\"miss\"}",
+          "legendFormat": "misses"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "type": "interval",
+        "name": "interval",
+        "query": "1m,5m,15m,30m,1h,2h",
+        "current": {
+          "selected": true,
+          "text": "5m",
+          "value": "5m"
+        }
+      },
+      {
+        "type": "datasource",
+        "name": "prometheus",
+        "query": "prometheus",
+        "current": {
+          "selected": true,
+          "text": "grafanacloud-prom",
+          "value": "grafanacloud-prom"
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Deploy",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "expr": "changes(multica_build_info[1m]) != 0",
+        "enable": true,
+        "iconColor": "purple",
+        "titleFormat": "Deploy detected",
+        "textFormat": "version: {{version}}, commit: {{commit}}"
+      }
+    ]
+  }
+}
